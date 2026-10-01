@@ -1,7 +1,3 @@
-
-> aura-proximity@0.3.0 android:build
-> bash scripts/build-android.sh :app:assembleDebug :app:lintDebug
-
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build
 Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
@@ -64,5 +60,5 @@ Wrote HTML report to file://<AURA_ROOT>/android/app/build/reports/lint-results-d
 
 > Task :app:lintDebug
 
-BUILD SUCCESSFUL in 20s
+BUILD SUCCESSFUL in 22s
 44 actionable tasks: 13 executed, 31 up-to-date

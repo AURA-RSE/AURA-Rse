@@ -1,5 +1,14 @@
 # Verification record
 
+## 2026-10-01 — floating nearby profiles
+
+- Added native iPhone and Android floating cards for profiles resolved through the existing opt-in, same-event BLE flow. Cards include protected avatars or initials, project/role, interest and availability; search, intent filters and list mode share the same authorized peers. Layout does not represent physical coordinates.
+- **Unsigned iPhone build passed. Android debug APK build passed.** Android lint: **0 errors, 5 existing warnings** (four dependency updates and debug HTTP).
+- **All four Android emulator instrumentation tests passed.** The new test uses generated API accounts and injected BLE observations, then exercises filtering, view switching, card-to-profile navigation, server-side blocking, expiry and pause clearing. The other tests cover encrypted session storage, missing-wallet fallback and profile edits/recreation. See `android-device-tests.txt`.
+- **30 API/core/store tests passed** again, preserving event isolation, presence revocation, blocking, report retention and payment checks.
+- `android-nearby-test-fixtures.png` is a labelled emulator screenshot of synthetic profiles. It is visual/UI evidence, not live participants or physical Bluetooth proof.
+- iPhone runtime interaction, physical iPhone↔Android discovery, actual wallet signing and two-iPhone spatial positioning remain pending. No GPS collection, face matching, public directory or multi-person AR positioning was added.
+
 ## 2026-10-01 — bounded safety-report retention and deletion semantics
 
 - **30 API/core/store tests passed.** New checks cover target deletion, reporter unlinking, re-registration isolation, export isolation, exact 90-day expiry, startup cleanup, schema v1/v2 migration, future-schema rejection and retained recipient wallets in other senders' payment history. See `api-tests.txt`.

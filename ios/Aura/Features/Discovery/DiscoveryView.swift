@@ -5,11 +5,16 @@ struct DiscoveryView: View {
     @State private var query = ""
     @State private var intent = "All"
     @State private var showCamera = false
-    var filtered:[NearbyPeer] { model.peers.filter { p in (intent == "All" || p.profile.intents.contains(intent)) && (query.isEmpty || "\(p.profile.name) \(p.profile.role) \(p.profile.project)".localizedCaseInsensitiveContains(query)) } }
+    @State private var presentation = "Floating"
+    var filtered:[NearbyPeer] { model.peers.filter { p in (intent == "All" || p.profile.intents.contains(intent)) && (query.isEmpty || "\(p.profile.name) \(p.profile.role) \(p.profile.project)".localizedCaseInsensitiveContains(query)) }.sorted { a,b in
+        let order = a.profile.name.localizedCaseInsensitiveCompare(b.profile.name)
+        return order == .orderedSame ? a.id < b.id : order == .orderedAscending
+    } }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:22) {
             HStack { Text("THE ROOM IS YOURS.").font(.caption2).tracking(2).foregroundStyle(AuraTheme.lime);Spacer();Text("DEVNET").font(.caption2.monospaced()).foregroundStyle(.secondary) }
-            Text("Find your people.").font(.system(size:36,weight:.semibold)).tracking(-1)
+            Text("Builders around you.").font(.system(size:36,weight:.semibold)).tracking(-1)
+            Text("Find a collaborator. Meet your next team.").font(.subheadline).foregroundStyle(.secondary)
             Picker("Event",selection:$model.selectedEvent) { Text("Choose an event").tag("");ForEach(model.events) { Text($0.name).tag($0.id) } }.disabled(model.active)
             HStack {
                 Button(model.active ? "Pause discovery" : "Start discovery ↗") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
@@ -23,13 +28,20 @@ struct DiscoveryView: View {
             }.padding().background(.white.opacity(0.05),in:RoundedRectangle(cornerRadius:14)) }
             TextField("Search people, roles, projects",text:$query).textFieldStyle(.roundedBorder)
             Picker("Intent",selection:$intent) { ForEach(["All","Building","Hiring","Fundraising","Looking for a team","Offering feedback","Open to connect"],id:\.self) { Text($0).tag($0) } }
-            HStack { Text("NEARBY").font(.caption2).tracking(2);Spacer();Text("\(filtered.count) discovered").font(.caption).foregroundStyle(.secondary) }
-            if filtered.isEmpty { ContentUnavailableView(model.active ? "Make room for a connection" : "Choose when to be seen",systemImage:"dot.radiowaves.left.and.right",description:Text(model.active ? "Participating devices appear here when discovered. Keep both phones open in the same event." : "Join an event in My Aura and choose a visible status to start.")) }
-            ForEach(filtered) { peer in Button { model.selectedPeer = peer.profile } label: { HStack(alignment:.top,spacing:15) {
-                Text(String(peer.profile.name.prefix(1))).font(.title2.bold()).frame(width:48,height:48).background(AuraTheme.lime.opacity(0.15),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(AuraTheme.lime)
-                VStack(alignment:.leading,spacing:7) { Text(peer.profile.name).font(.headline).foregroundStyle(.white);Text(peer.profile.role + " · " + peer.profile.project).font(.subheadline).foregroundStyle(.secondary);Text(peer.profile.statusLabel).font(.caption).foregroundStyle(peer.profile.status == "open" ? AuraTheme.lime : .orange) }
-                Spacer();Image(systemName:"arrow.up.right").foregroundStyle(.secondary)
-            }.padding(18).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:18)) } }
+            Picker("Nearby view",selection:$presentation) { Text("Floating").tag("Floating");Text("List").tag("List") }.pickerStyle(.segmented)
+            HStack { Text(model.active ? "LIVE IN YOUR EVENT" : "DISCOVERY PAUSED").font(.caption2).tracking(2);Spacer();Text("\(filtered.count) nearby").font(.caption).foregroundStyle(AuraTheme.lime) }
+            Text("Opt-in profiles discovered nearby. Cards are arranged for browsing; exact positions are not shown.").font(.caption).foregroundStyle(.secondary)
+            if filtered.isEmpty {
+                ContentUnavailableView(!model.active ? "Choose when to be seen" : model.peers.isEmpty ? "Your next connection is nearby" : "Try another filter",systemImage:"person.2.wave.2",description:Text(!model.active ? "Join an event in My Aura and choose a visible status to start." : model.peers.isEmpty ? "Keep both phones open in the same event. Profiles appear when their devices are discovered." : "No nearby profiles match this search and intent."))
+            } else if presentation == "Floating" {
+                NearbyProfileField(peers:filtered) { model.selectedPeer = $0 }
+            } else {
+                ForEach(filtered) { peer in Button { model.selectedPeer = peer.profile } label: { HStack(alignment:.top,spacing:15) {
+                    NearbyAvatar(profile:peer.profile,size:48)
+                    VStack(alignment:.leading,spacing:7) { Text(peer.profile.name).font(.headline).foregroundStyle(.white);Text([peer.profile.role,peer.profile.project].filter{!$0.isEmpty}.joined(separator:" · ")).font(.subheadline).foregroundStyle(.secondary);Text(peer.profile.statusLabel).font(.caption).foregroundStyle(peer.profile.status == "open" ? AuraTheme.lime : .orange) }
+                    Spacer();Image(systemName:"arrow.up.right").foregroundStyle(.secondary)
+                }.padding(18).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:18)) } .buttonStyle(.plain) }
+            }
         }.padding(24) }.background(AuraTheme.background).navigationBarHidden(true).sheet(isPresented:$showCamera) { CameraSheet(model:model,positioning:model.positioning) } }
     }
 }

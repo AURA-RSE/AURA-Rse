@@ -45,6 +45,8 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
     private BleDiscovery radio;
     private LinearLayout root, body, nearbyList;
     private TextView notice;
+    private String nearbyRenderKey;
+    private boolean floatingProfiles = true;
     private JSONObject profile;
     private JSONArray events = new JSONArray(), connections = new JSONArray(), payments = new JSONArray();
     private String origin, token, selectedEvent = "", tab = "Discover", search = "", intent = "All";
@@ -103,7 +105,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         parent.addView(text(label,12,MUTED));EditText edit = new EditText(this);edit.setTextColor(Color.WHITE);edit.setTextSize(15);edit.setSingleLine(true);edit.setText(value);edit.setBackground(background(PANEL,8));edit.setPadding(dp(14),dp(10),dp(14),dp(10));edit.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(max)});parent.addView(edit,new LinearLayout.LayoutParams(-1,dp(50)));return edit;
     }
     private Spinner select(LinearLayout parent,String label,List<String> labels,int selection,java.util.function.IntConsumer change) {
-        parent.addView(text(label,12,MUTED));Spinner spinner = new Spinner(this);ArrayAdapter<String> adapter = new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels);spinner.setAdapter(adapter);spinner.setSelection(Math.max(0,selection));parent.addView(spinner,new LinearLayout.LayoutParams(-1,dp(48)));
+        parent.addView(text(label,12,MUTED));Spinner spinner = new Spinner(this);spinner.setTag(label);ArrayAdapter<String> adapter = new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels);spinner.setAdapter(adapter);spinner.setSelection(Math.max(0,selection));parent.addView(spinner,new LinearLayout.LayoutParams(-1,dp(48)));
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> p,View view,int i,long id){change.accept(i);}public void onNothingSelected(AdapterView<?> p){}});return spinner;
     }
     private void render() {
@@ -157,26 +159,52 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         },null);
     }
     private void discover() {
-        body.addView(text("THE ROOM IS YOURS.",11,LIME));title(body,"Find your people.");
+        body.addView(text("THE ROOM IS YOURS.",11,LIME));title(body,"Builders around you.");body.addView(text("Find a collaborator. Meet your next team.",15,MUTED));
         List<String> names=new ArrayList<>();List<String> ids=new ArrayList<>();int chosen=0;
         for(int i=0;i<events.length();i++){JSONObject e=events.optJSONObject(i);names.add(e.optString("name"));ids.add(e.optString("id"));if(e.optString("id").equals(selectedEvent))chosen=i;}
         if(names.isEmpty()){names.add("Join an event in My Aura");ids.add("");}
         Spinner event=select(body,"Your event",names,chosen,i->selectedEvent=ids.get(i));event.setEnabled(!active && !starting);
         button(body,active?"Pause discovery":starting?"Cancel discovery start":"Start discovery ↗",()->{if(active||starting){stopDiscovery();render();}else startDiscovery();});
         body.addView(text(active?"Keep Aura open. Nearby participants appear when their devices are discovered.":"Your phone is not broadcasting. Select a visible status and start when you are ready.",13,MUTED));
-        EditText query=field(body,"Search name, role or project",search,100);query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){search=s.toString();renderPeers();}public void afterTextChanged(Editable e){}});
+        EditText query=field(body,"Search name, role or project",search,100);query.setTag("nearby-search");query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){search=s.toString();renderPeers();}public void afterTextChanged(Editable e){}});
         List<String> filters=new ArrayList<>();filters.add("All");filters.addAll(Arrays.asList(INTENTS));select(body,"Connection intent",filters,filters.indexOf(intent),i->{intent=filters.get(i);renderPeers();});
-        nearbyList=column();body.addView(nearbyList);renderPeers();
+        RadioGroup mode=new RadioGroup(this);mode.setOrientation(LinearLayout.HORIZONTAL);
+        for(String name:new String[]{"Floating","List"}){RadioButton option=new RadioButton(this);option.setId(View.generateViewId());option.setText(name);option.setTextColor(Color.WHITE);option.setTag("nearby-mode-"+name);mode.addView(option,new RadioGroup.LayoutParams(0,-2,1));option.setChecked(floatingProfiles=="Floating".equals(name));}
+        mode.setOnCheckedChangeListener((group,id)->{RadioButton chosenMode=group.findViewById(id);floatingProfiles="Floating".contentEquals(chosenMode.getText());renderPeers();});body.addView(mode);
+        nearbyList=column();nearbyRenderKey=null;body.addView(nearbyList);renderPeers();
     }
     private void renderPeers() {
-        if(nearbyList==null||!"Discover".equals(tab))return;nearbyList.removeAllViews();int count=0;
-        for(Peer peer:peers.values()){
-            JSONObject p=peer.profile;String searchable=p.optString("name")+" "+p.optString("role")+" "+p.optString("project");
+        if(nearbyList==null||!"Discover".equals(tab))return;
+        List<Peer> matches=new ArrayList<>();long now=System.currentTimeMillis();
+        if(active)for(Peer peer:peers.values()){
+            JSONObject p=peer.profile;if(!PresenceRules.fresh(peer.seen,peer.expires,now)||"stealth".equals(p.optString("status")))continue;
+            String searchable=p.optString("name")+" "+p.optString("role")+" "+p.optString("project");
             if(!searchable.toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT)))continue;
-            boolean matches="All".equals(intent);JSONArray intents=p.optJSONArray("intents");if(intents!=null)for(int i=0;i<intents.length();i++)if(intent.equals(intents.optString(i)))matches=true;if(!matches)continue;
-            count++;button(nearbyList,p.optString("name")+"\n"+p.optString("role")+" · "+p.optString("project"),()->detail(p,""));nearbyList.addView(text("heads-down".equals(p.optString("status"))?"Heads down · avoid interruptions":"Open to connect",12,MUTED));
+            boolean matchesIntent="All".equals(intent);JSONArray intents=p.optJSONArray("intents");if(intents!=null)for(int i=0;i<intents.length();i++)if(intent.equals(intents.optString(i)))matchesIntent=true;
+            if(matchesIntent)matches.add(peer);
         }
-        if(count==0)nearbyList.addView(text("No matching participants discovered yet. Nothing is simulated here.",14,MUTED));
+        matches.sort((a,b)->{int order=a.profile.optString("name").compareToIgnoreCase(b.profile.optString("name"));return order!=0?order:a.profile.optString("wallet").compareTo(b.profile.optString("wallet"));});
+        StringBuilder key=new StringBuilder(active+":"+floatingProfiles+":"+search+":"+intent);
+        for(Peer peer:matches)key.append('|').append(peer.profile.toString());
+        if(key.toString().equals(nearbyRenderKey))return;nearbyRenderKey=key.toString();nearbyList.removeAllViews();
+        nearbyList.addView(text((active?"LIVE IN YOUR EVENT":"DISCOVERY PAUSED")+" · "+matches.size()+" nearby",11,LIME));
+        nearbyList.addView(text("Opt-in profiles discovered nearby. Cards are arranged for browsing; exact positions are not shown.",12,MUTED));
+        if(matches.isEmpty()){
+            title(nearbyList,!active?"Choose when to be seen":peers.isEmpty()?"Your next connection is nearby":"Try another filter");
+            nearbyList.addView(text(!active?"Choose a visible status and start discovery when you are ready.":peers.isEmpty()?"Keep both phones open in the same event. Profiles appear when their devices are discovered.":"No nearby profiles match this search and intent.",14,MUTED));return;
+        }
+        if(!floatingProfiles){for(Peer peer:matches){JSONObject p=peer.profile;button(nearbyList,p.optString("name")+"\n"+p.optString("role")+" · "+p.optString("project"),()->detail(p,""));nearbyList.addView(text("heads-down".equals(p.optString("status"))?"Heads down · avoid interruptions":"Open to connect",12,MUTED));}return;}
+        LinearLayout field=new LinearLayout(this);field.setClipChildren(false);field.setClipToPadding(false);field.setPadding(0,dp(8),0,dp(10));nearbyList.addView(field);
+        int columns=getResources().getConfiguration().fontScale>=1.3f?1:2;List<LinearLayout> lanes=new ArrayList<>();
+        for(int i=0;i<columns;i++){LinearLayout lane=column();lane.setClipChildren(false);lane.setClipToPadding(false);lane.setPadding(0,i==1?dp(24):0,0,0);LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,-2,1);if(i>0)params.setMargins(dp(12),0,0,0);field.addView(lane,params);lanes.add(lane);}
+        for(int i=0;i<matches.size();i++){
+            JSONObject p=matches.get(i).profile;NearbyProfileCard card=new NearbyProfileCard(this,p,i%2==1,()->detail(p,""));
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.setMargins(0,dp(8),0,dp(16));lanes.get(i%columns).addView(card,params);
+            String avatar=p.isNull("avatarMediaId")?"":p.optString("avatarMediaId");
+            if(!avatar.isEmpty())request(c->AuraApi.object("data",Base64.encodeToString(c.media(avatar),Base64.NO_WRAP)),reply->{
+                if(!card.isAttachedToWindow())return;byte[] bytes=Base64.decode(reply.getString("data"),Base64.NO_WRAP);BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);options.inSampleSize=1;while(options.outWidth/options.inSampleSize>256||options.outHeight/options.inSampleSize>256)options.inSampleSize*=2;options.inJustDecodeBounds=false;card.setAvatar(BitmapFactory.decodeByteArray(bytes,0,bytes.length,options));
+            },ignored->{});
+        }
     }
     private void startDiscovery() {
         if(active || starting || !foreground || destroyed)return;
@@ -201,7 +229,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         main.postDelayed(heartbeat,3000);
     }
     private void revoke(){AuraApi current=api;if(token!=null&&!presenceIo.isShutdown())presenceIo.execute(()->{try{current.call("DELETE","/api/presence",AuraApi.object());}catch(Exception ignored){}});}
-    private void stopDiscovery(){boolean wasActive=active||starting;active=false;starting=false;discoveryEpoch++;heartbeatBusy=false;main.removeCallbacks(heartbeat);radio.stop();peers.clear();resolving.clear();if(wasActive)revoke();}
+    private void stopDiscovery(){boolean wasActive=active||starting;active=false;starting=false;discoveryEpoch++;heartbeatBusy=false;main.removeCallbacks(heartbeat);radio.stop();peers.clear();resolving.clear();renderPeers();if(wasActive)revoke();}
     @Override public void onToken(String device,String observed,int rssi){
         if(!active||!resolving.add(observed))return;final int run=discoveryEpoch;
         request(c->c.post("/api/discovery/resolve",AuraApi.object("token",observed)),r->{if(!active||run!=discoveryEpoch)return;resolving.remove(observed);if(!selectedEvent.equals(r.getString("event")))return;Peer peer=new Peer();peer.profile=r.getJSONObject("profile");peer.device=device;peer.rssi=rssi;peer.seen=System.currentTimeMillis();peer.expires=r.getLong("expires");peers.values().removeIf(p->device.equals(p.device));peers.put(peer.profile.getString("wallet"),peer);renderPeers();},r->{if(!active||run!=discoveryEpoch)return;resolving.remove(observed);peers.values().removeIf(p->device.equals(p.device));renderPeers();});
@@ -221,7 +249,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         body.addView(text("Stealth stops discovery. Saved connections retain profile access unless blocked. Notes are private to your account.",12,MUTED));button(body,"Export, delete and manage blocks ↗",()->open(origin));button(body,"Sign out",()->{AuraApi current=api;stopDiscovery();if(!io.isShutdown())io.execute(()->{try{current.post("/api/auth/logout",AuraApi.object());}catch(Exception ignored){}});clearSession();});
     }
     private void detail(JSONObject peer,String savedNote){
-        LinearLayout card=column();card.setPadding(dp(20),dp(12),dp(20),dp(16));title(card,peer.optString("name"));card.addView(text(peer.optString("role")+" · "+peer.optString("project"),15,MUTED));card.addView(text(peer.optString("bio"),14,MUTED));TextView address=text(peer.optString("wallet"),12,LIME);address.setTextIsSelectable(true);card.addView(address);
+        LinearLayout card=column();card.setPadding(dp(20),dp(12),dp(20),dp(16));title(card,peer.optString("name"));card.addView(text("heads-down".equals(peer.optString("status"))?"Heads down · avoid interruptions":"Open to connect",12,LIME));JSONArray peerIntents=peer.optJSONArray("intents");if(peerIntents!=null){List<String> labels=new ArrayList<>();for(int i=0;i<peerIntents.length();i++)labels.add(peerIntents.optString(i));card.addView(text(String.join(" · ",labels),12,MUTED));}card.addView(text(peer.optString("role")+" · "+peer.optString("project"),15,MUTED));card.addView(text(peer.optString("bio"),14,MUTED));TextView address=text(peer.optString("wallet"),12,LIME);address.setTextIsSelectable(true);card.addView(address);
         String link=peer.optString("link");if(link.startsWith("https://"))button(card,"Visit project / social ↗",()->open(link));String video=peer.optString("video");if(video.startsWith("https://"))button(card,"Watch intro link ↗",()->open(video));
         EditText note=field(card,"Private note",savedNote,1000);button(card,"Save connection",()->{String value=note.getText().toString();request(c->c.call("PUT","/api/connections",AuraApi.object("wallet",peer.optString("wallet"),"note",value)),r->{message("Connection saved.");refresh();},null);});
         EditText amount=field(card,"Devnet SOL amount (maximum 1)","0.01",16);amount.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);button(card,"Review in Android wallet ↗",()->{String value=amount.getText().toString();request(c->c.post("/api/payments",AuraApi.object("wallet",peer.optString("wallet"),"amount",value)),this::reviewNativePayment,null);});button(card,"Review payment in wallet companion ↗",()->{String value=amount.getText().toString();request(c->c.post("/api/payments",AuraApi.object("wallet",peer.optString("wallet"),"amount",value)),r->open(origin+"?payment="+r.getString("id")),null);});

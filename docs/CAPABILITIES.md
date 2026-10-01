@@ -16,6 +16,7 @@ This matrix tracks the implementation and validation of Aura’s mobile apps and
 | iOS UWB positioning | Created-before-exchange NISession, authenticated relay, explicit acceptance, one active peer, expiry | Compiled only; physical distance/direction, occlusion and orientation tests required |
 | iOS AR identity | ARKit/NI shared session, measured world transform, stale clearing, projection/tracking gate | No BLE-derived invented position; physical registration accuracy unverified |
 | Multi-person room overlays | Not yet implemented | Current UWB pilot is one accepted peer at a time; multi-session feasibility study required |
+| Floating nearby profiles | Native iOS and Android cards, protected avatars, name/role/project search, intent filters and list alternative; populated by authorized BLE resolution | Browsing layout, not measured coordinates; Android UI fixtures and physical-device evidence are tracked separately |
 | Nearby fallback | List/search of resolved BLE peers independent of UWB | Compiled; non-UWB device testing required |
 | SOL payments | Devnet-only, exact decimal conversion, review, web Wallet Standard / Android MWA signing, validated signed submission, durable signature, RPC receipt verification | API + browser tests use mock RPC; real wallet/devnet round trip still required |
 | SPL payments | Not implemented | Token allowlist, decimals, associated token accounts, native wallet support, and receipt verification required |

@@ -34,13 +34,53 @@ public final class AndroidPilotTest {
         AuraApi api=new AuraApi(origin,token);String old=api.get("/api/me").getJSONObject("profile").getString("name");
         SecureSession store=new SecureSession(context());store.save(origin,token);context().getSharedPreferences("aura-settings",0).edit().putString("server",origin).commit();
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-            awaitText(scenario,"Find your people.");
+            awaitText(scenario,"Builders around you.");
             scenario.onActivity(a->text(a.findViewById(android.R.id.content),"My Aura").performClick());awaitText(scenario,old);
             // Wait for the tab's asynchronous refresh to finish before editing.
             Thread.sleep(500);
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);View name=text(root,old);assertTrue(name instanceof EditText);((EditText)name).setText("Android UI verified");text(root,"Save profile").performClick();});
             awaitText(scenario,"Profile saved.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
-            scenario.recreate();awaitText(scenario,"Find your people.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
+            scenario.recreate();awaitText(scenario,"Builders around you.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
         }finally{store.clear(origin);context().getSharedPreferences("aura-settings",0).edit().clear().commit();}
     }
+    private static void setPrivate(Object object,String name,Object value){try{var f=object.getClass().getDeclaredField(name);f.setAccessible(true);f.set(object,value);}catch(Exception e){throw new AssertionError(e);}}
+    private static void callPrivate(Object object,String name){try{var m=object.getClass().getDeclaredMethod(name);m.setAccessible(true);m.invoke(object);}catch(Exception e){throw new AssertionError(e);}}
+    @Test public void floatingProfilesFilterOpenAndClearUsingAuthorizedApiFixtures() throws Exception {
+        var args=InstrumentationRegistry.getArguments();String origin=args.getString("auraOrigin"),token=args.getString("auraToken"),peerToken=args.getString("auraPeerToken"),otherToken=args.getString("auraOtherPeerToken"),peerWallet=args.getString("auraPeerWallet");
+        assertNotNull(peerToken);assertNotNull(otherToken);assertNotNull(peerWallet);
+        SecureSession store=new SecureSession(context());store.save(origin,token);context().getSharedPreferences("aura-settings",0).edit().putString("server",origin).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            awaitText(scenario,"Builders around you.");Thread.sleep(500);
+            scenario.onActivity(a->{
+                // Only the instrumentation test injects observed BLE tokens. The real API
+                // still checks membership and consent; no fixture hook ships in the app.
+                setPrivate(a,"active",true);callPrivate(a,"render");
+                a.onToken("fixture-builder",peerToken,-50);a.onToken("fixture-hiring",otherToken,-55);
+            });
+            awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(root.findViewWithTag("nearby-profile-"+peerWallet));((android.widget.Spinner)root.findViewWithTag("Connection intent")).setSelection(2);});
+            awaitText(scenario,"LIVE IN YOUR EVENT · 1 nearby");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Hiring fixture"));assertNull(text(root,"Builder fixture"));((android.widget.Spinner)root.findViewWithTag("Connection intent")).setSelection(0);});
+            awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
+            scenario.onActivity(a->((EditText)a.findViewById(android.R.id.content).findViewWithTag("nearby-search")).setText("no-such-project"));
+            awaitText(scenario,"Try another filter");
+            scenario.onActivity(a->((EditText)a.findViewById(android.R.id.content).findViewWithTag("nearby-search")).setText(""));
+            awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);root.findViewWithTag("nearby-mode-List").performClick();assertNull(root.findViewWithTag("nearby-profile-"+peerWallet));assertNotNull(partial(root,"Builder fixture"));root.findViewWithTag("nearby-mode-Floating").performClick();root.findViewWithTag("nearby-profile-"+peerWallet).performClick();});
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(a->{boolean found=false;for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews())if(text(window,"Save connection")!=null)found=true;assertTrue("Card opens the existing profile detail",found);});
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            // Screenshot is explicitly labelled as synthetic UI evidence, not a radio test.
+            scenario.onActivity(a->{try{var f=MainActivity.class.getDeclaredField("notice");f.setAccessible(true);((TextView)f.get(a)).setText("TEST FIXTURES · No live people or radio evidence");View root=a.findViewById(android.R.id.content);root.findViewWithTag("nearby-profile-"+peerWallet).requestRectangleOnScreen(new android.graphics.Rect(0,0,1,600),true);}catch(Exception e){throw new AssertionError(e);}});
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(350);
+            android.graphics.Bitmap screenshot=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(screenshot);
+            java.io.File destination=new java.io.File(context().getExternalFilesDir(null),"nearby-test-fixtures.png");try(var stream=new java.io.FileOutputStream(destination)){screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream);}screenshot.recycle();
+            new AuraApi(origin,token).post("/api/blocks",AuraApi.object("wallet",peerWallet));
+            scenario.onActivity(a->a.onToken("fixture-builder",peerToken,-50));
+            awaitText(scenario,"LIVE IN YOUR EVENT · 1 nearby");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNull(root.findViewWithTag("nearby-profile-"+peerWallet));try{var field=MainActivity.class.getDeclaredField("peers");field.setAccessible(true);for(Object peer:((java.util.Map<?,?>)field.get(a)).values())setPrivate(peer,"expires",System.currentTimeMillis()-1);}catch(Exception e){throw new AssertionError(e);}callPrivate(a,"renderPeers");assertNotNull(text(root,"LIVE IN YOUR EVENT · 0 nearby"));});
+            scenario.onActivity(a->{callPrivate(a,"stopDiscovery");View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Choose when to be seen"));assertNull(root.findViewWithTag("nearby-profile-"+peerWallet));});
+        }finally{store.clear(origin);context().getSharedPreferences("aura-settings",0).edit().clear().commit();}
+    }
+
 }

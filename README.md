@@ -6,6 +6,10 @@ Aura brings opt-in discovery and wallet-linked identity to Solana gatherings. Na
 
 Source repository: [AURA-RSE/AURA-Rse](https://github.com/AURA-RSE/AURA-Rse). Aura is maintained as a standalone project. The original supplied iOS project is preserved separately; the revised Xcode project is `ios/Aura.xcodeproj`. Local databases, credentials, toolchains, build caches and generated handoff bundles are excluded from Git.
 
+## Builders around you
+
+Discover opt-in participants as floating profile cards on iPhone and Android. Filter by intent, open a profile, save a connection or switch to a list. Cards show people resolved through nearby Bluetooth discovery in your event; the layout is not a geographic map. See [nearby profiles](docs/NEARBY.md).
+
 ## Run locally
 
 Requirements: Node 22.13+ (tested on Node 25.9), npm, Xcode for iOS builds.
