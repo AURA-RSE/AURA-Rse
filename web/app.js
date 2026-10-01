@@ -1,0 +1,73 @@
+import {getWallets} from '@wallet-standard/app';
+import {Connection,PublicKey,SystemProgram,Transaction} from '@solana/web3.js';
+import bs58 from 'bs58';
+import {AuraClient} from '../packages/sdk/index.mjs';
+const $=s=>document.querySelector(s),api=new AuraClient({baseURL:location.origin});
+let selectedWallet,account,myProfile,currentPayment,paying=false;
+const intents=['Building','Hiring','Fundraising','Looking for a team','Offering feedback','Open to connect'];
+const registry=getWallets();
+function notice(message,error=false){$('#notice').textContent=message;$('#notice').classList.toggle('error',error);}
+function el(tag,content,className){const e=document.createElement(tag);if(content!==undefined)e.textContent=content;if(className)e.className=className;return e;}
+function button(label,handler,style='secondary'){const b=el('button',label,style);b.type='button';b.onclick=()=>guard(handler,b);return b;}
+async function guard(action,control){if(control)control.disabled=true;try{await action();}catch(e){notice(e.message,true);}finally{if(control)control.disabled=false;}}
+function showWallets(){const wallets=registry.get().filter(w=>w.chains.includes('solana:devnet')&&w.features['standard:connect']&&w.features['solana:signMessage']&&w.features['solana:signTransaction']);const list=$('#wallets');list.replaceChildren(...wallets.map(w=>button(w.name,()=>connect(w))));if(!wallets.length)list.append(el('p','No compatible wallet detected. Open Aura in a Solana wallet browser or a desktop browser with a compatible wallet extension.'));$('#wallet-picker').hidden=false;$('#wallet-picker').scrollIntoView({behavior:'smooth'});}
+async function connect(w){
+ const {accounts}=await w.features['standard:connect'].connect();const a=accounts.find(a=>a.chains.includes('solana:devnet')&&a.features.includes('solana:signMessage')&&a.features.includes('solana:signTransaction'));if(!a)throw new Error('This account does not support devnet message and transaction signing.');
+ const p=await api.signIn(a.address,async message=>{const [result]=await w.features['solana:signMessage'].signMessage({account:a,message});if(!result||!equal(result.signedMessage,message))throw new Error('Wallet returned a different sign-in message');return result.signature;});
+ selectedWallet=w;account=a;myProfile=p;$('#wallet-picker').hidden=true;$('#workspace').hidden=false;$('#connect').textContent='Wallet verified ✓';fillProfile();await refresh();notice('Wallet verified. Complete your profile, then pair the Aura mobile app.');
+ w.features['standard:events']?.on('change',({accounts})=>{if(accounts&&!accounts.some(x=>x.address===account?.address)){guard(logout);}});
+ const id=new URLSearchParams(location.search).get('payment');if(id){const {payments}=await api.request('/api/payments');const p=payments.find(p=>p.id===id);if(p&&!p.signature&&!p.submitted_signature)review(p);else if(p?.submitted_signature&&!p.signature){$('#payments').scrollIntoView({behavior:'smooth'});notice('This payment was submitted. Use Check signature below to verify confirmation.');}else notice(p?.signature?'This payment is already confirmed.':'Payment unavailable for this wallet.');}
+}
+function equal(a,b){return a.length===b.length&&a.every((v,i)=>v===b[i]);}
+function fillProfile(){const form=$('#profile');for(const key of ['name','role','project','bio','link','video','status'])form.elements[key].value=myProfile[key];for(const input of form.querySelectorAll('[name=intent]'))input.checked=myProfile.intents.includes(input.value);$('#identity-name').textContent=myProfile.name||'Your story starts here';$('#address').textContent=myProfile.wallet;guard(renderMyMedia);}
+for(const value of intents){const label=el('label');const input=el('input');input.type='checkbox';input.name='intent';input.value=value;label.append(input,document.createTextNode(value));$('#intents').append(label);}
+$('#connect').onclick=showWallets;$('#start').onclick=()=>api.token?$('#workspace').scrollIntoView({behavior:'smooth'}):showWallets();
+registry.on('register',()=>{if(!$('#wallet-picker').hidden)showWallets();});
+$('#profile').onsubmit=e=>{e.preventDefault();guard(async()=>{const f=new FormData(e.target);const p=Object.fromEntries(['name','role','project','bio','link','video','status'].map(k=>[k,f.get(k)]));p.intents=f.getAll('intent');myProfile=(await api.saveProfile(p)).profile;fillProfile();notice('Profile saved. Your presence setting is enforced by the server.');},e.submitter);};
+$('#device').onsubmit=e=>{e.preventDefault();guard(async()=>{await api.request('/api/device/approve',{code:new FormData(e.target).get('code')});notice('Device approved. Return to Aura on your phone.');e.target.reset();},e.submitter);};
+$('#event').onsubmit=e=>{e.preventDefault();guard(async()=>{const {event}=await api.join(new FormData(e.target).get('code'));notice(`Joined ${event.name}. Select it in the Aura mobile app to start discovery.`);await refresh();},e.submitter);};
+$('#create-event').onsubmit=e=>{e.preventDefault();guard(async()=>{const r=await api.request('/api/events',{name:new FormData(e.target).get('name')});$('#event-code').textContent=`Invite code: ${r.code} — share only with your pilot participants.`;await refresh();},e.submitter);};
+async function refresh(){
+ const [{connections},{events},{payments}]=await Promise.all([api.connections(),api.request('/api/events'),api.request('/api/payments')]);
+ $('#events').replaceChildren(...events.map(e=>el('p',e.name)));const list=$('#connections');list.replaceChildren();
+ for(const c of connections){const p=c.profile;if(!p)continue;const card=el('article',undefined,'person');card.append(el('h3',p.name),el('p',`${p.role}${p.project?' · '+p.project:''}`),el('code',p.wallet),el('p',c.note||'No private note yet.'));if(p.link){const a=el('a','Visit project ↗');a.href=p.link;a.target='_blank';a.rel='noopener noreferrer';card.append(a);}
+ const actions=el('div',undefined,'actions');actions.append(button('Send devnet SOL',async()=>{const amount=prompt('Amount in devnet SOL (maximum 1):','0.01');if(amount===null)return;review(await api.createPayment(p.wallet,amount));}),button('Private note',async()=>{const note=prompt('Your private note (only visible to you):',c.note);if(note===null)return;await api.saveConnection(p.wallet,note);await refresh();}),button('Remove',async()=>{await api.request('/api/connections',{wallet:p.wallet},'DELETE');await refresh();}),button('Report',async()=>{const reason=prompt('Describe the issue for the pilot operator:');if(!reason)return;await api.report(p.wallet,reason);notice('Report stored for operator review.');}),button('Block',async()=>{if(!confirm(`Block ${p.name}?`))return;await api.block(p.wallet);await refresh();}));card.append(actions);list.append(card);}
+ if(!connections.length)list.append(el('div','No saved connections yet. Discover someone in the Aura mobile app and save their profile. Nearby participants are never fabricated here.','empty'));
+ const paymentList=$('#payments');paymentList.replaceChildren();for(const p of payments){const row=el('div',undefined,'payment-row'),info=el('div');info.append(el('p',`${p.lamports/1e9} SOL → ${p.recipient.slice(0,6)}…${p.recipient.slice(-6)}`),el('p',p.signature?'Confirmed on devnet':p.expires<Date.now()?'Review expired · check wallet history before retrying':'Awaiting wallet approval or confirmation','hint'));row.append(info);if(p.signature){const a=el('a','View transaction ↗');a.href=`https://explorer.solana.com/tx/${p.signature}?cluster=devnet`;a.target='_blank';a.rel='noopener noreferrer';row.append(a);}else if(p.expires>Date.now()&&!p.submitted_signature){row.append(button('Review',()=>review(p)));}row.append(button('Check signature',async()=>{const pending=JSON.parse(sessionStorage.getItem('aura.pendingPayment')||'null');const signature=p.submitted_signature||(pending?.id===p.id?pending.signature:null)||prompt('Paste the signature from your wallet history. This only checks; it does not send another payment.');if(!signature)return;const result=await api.confirmPayment(p.id,signature);notice(result.state==='confirmed'?'Transaction verified on devnet.':'Not confirmed yet. Check again later.');await refresh();}));paymentList.append(row);}if(!payments.length)paymentList.append(el('div','No payment requests yet.','empty'));
+}
+function review(p){currentPayment=p;$('#payment-detail').replaceChildren(el('h3',`${p.lamports/1e9} devnet SOL`),el('p','Recipient wallet'),el('code',p.recipient));$('#payment-dialog').showModal();}
+$('#approve-payment').onclick=()=>guard(async()=>{
+ if(paying)throw new Error('A payment is already in progress.');const p=currentPayment;if(p?.submitted_signature)throw new Error('This payment was already submitted. Check its signature instead of signing again.');if(!p||p.sender!==account.address||p.expires<=Date.now())throw new Error('Payment expired or belongs to another wallet.');
+ paying=true;let signature;
+ try {
+ const connection=new Connection(location.origin+'/rpc',{commitment:'confirmed',httpHeaders:{Authorization:`Bearer ${api.token}`},disableRetryOnRateLimit:true});
+ const latest=await connection.getLatestBlockhash('confirmed');const tx=new Transaction({...latest,feePayer:new PublicKey(account.address)});const instruction=SystemProgram.transfer({fromPubkey:new PublicKey(account.address),toPubkey:new PublicKey(p.recipient),lamports:p.lamports});instruction.keys.push({pubkey:new PublicKey(p.reference),isSigner:false,isWritable:false});tx.add(instruction);
+ const unsigned=tx.serialize({requireAllSignatures:false,verifySignatures:false});const [result]=await selectedWallet.features['solana:signTransaction'].signTransaction({account,chain:'solana:devnet',transaction:unsigned});const signed=Transaction.from(result.signedTransaction);
+ if(!equal(signed.serializeMessage(),tx.serializeMessage())||!signed.verifySignatures())throw new Error('Wallet returned an unexpected or invalid transaction.');signature=bs58.encode(signed.signature);
+ // Store only public transaction metadata so a reload can recover uncertain submission.
+ sessionStorage.setItem('aura.pendingPayment',JSON.stringify({id:p.id,signature,lastValidBlockHeight:latest.lastValidBlockHeight}));
+ $('#payment-dialog').close();notice('Submitting signed transaction. Do not submit another payment while confirmation is pending.');
+ const submission=await api.request('/api/payments/submit',{id:p.id,transaction:Buffer.from(result.signedTransaction).toString('base64')});signature=submission.signature;p.submitted_signature=signature;sessionStorage.setItem('aura.pendingPayment',JSON.stringify({id:p.id,signature}));
+ for(let i=0;i<12;i++){const result=await api.confirmPayment(p.id,signature);if(result.state==='confirmed'){sessionStorage.removeItem('aura.pendingPayment');notice('Confirmed on Solana devnet.');await refresh();return;}await new Promise(r=>setTimeout(r,2000));}
+ notice(`Confirmation pending. Check this signature before retrying: ${signature}`);await refresh();
+ }catch(error){notice(signature?`${error.message}. Submission may be pending. Check signature ${signature} before creating another payment.`:error.message,true);}finally{paying=false;}
+},$('#approve-payment'));
+$('#refresh').onclick=()=>guard(refresh,$('#refresh'));
+async function logout(){try{await api.request('/api/auth/logout',{});}finally{api.token=null;account=null;myProfile=null;$('#workspace').hidden=true;$('#connect').textContent='Connect wallet ↗';notice('Signed out. Presence revoked.');}}
+$('#logout').onclick=()=>guard(logout);
+$('#export').onclick=()=>guard(async()=>{const data=await api.request('/api/account/export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=el('a');a.href=url;a.download='aura-personal-data.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+$('#blocks').onclick=()=>guard(async()=>{const {blocks}=await api.request('/api/blocks');$('#blocked').replaceChildren(...blocks.map(b=>{const row=el('p',b.target+' ');row.append(button('Unblock',async()=>{await api.request('/api/blocks',{wallet:b.target},'DELETE');row.remove();}));return row;}));if(!blocks.length)$('#blocked').append(el('p','No blocked wallets.'));});
+$('#delete').onclick=()=>guard(async()=>{if(prompt('This removes your Aura profile, private notes, and account records. On-chain transactions remain public. Type DELETE to continue:')!=='DELETE')return;await api.request('/api/account',{confirm:'DELETE'},'DELETE');api.token=null;$('#workspace').hidden=true;$('#connect').textContent='Connect wallet ↗';notice('Aura account deleted.');});
+
+let mediaURLs=[];
+async function mediaURL(id){const r=await fetch('/api/media/'+encodeURIComponent(id),{headers:{Authorization:`Bearer ${api.token}`}});if(!r.ok)throw new Error('Media unavailable');const url=URL.createObjectURL(await r.blob());mediaURLs.push(url);return url;}
+async function renderMyMedia(){for(const url of mediaURLs)URL.revokeObjectURL(url);mediaURLs=[];const container=$('#my-media');container.replaceChildren();if(myProfile?.avatarMediaId){const image=el('img');image.alt='Your Aura avatar';image.src=await mediaURL(myProfile.avatarMediaId);container.append(image,button('Remove avatar',()=>removeMedia('avatar')));}if(myProfile?.videoMediaId){const video=el('video');video.controls=true;video.src=await mediaURL(myProfile.videoMediaId);container.append(video,button('Remove clip',()=>removeMedia('video')));}}
+async function removeMedia(kind){myProfile=(await api.request('/api/media',{kind},'DELETE')).profile;await renderMyMedia();}
+async function uploadMedia(kind,file){
+ if(!file)return;if(!api.token)throw new Error('Verify your wallet first.');if(file.size>(kind==='avatar'?2:20)*1024*1024)throw new Error('File exceeds the upload limit.');
+ if(kind==='video')await new Promise((resolve,reject)=>{const video=document.createElement('video'),url=URL.createObjectURL(file);video.preload='metadata';video.onloadedmetadata=()=>{URL.revokeObjectURL(url);Number.isFinite(video.duration)&&video.duration<=30?resolve():reject(new Error('Choose an intro clip of 30 seconds or less.'));};video.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('This video cannot be decoded.'));};video.src=url;});
+ const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file);});
+ myProfile=(await api.request('/api/media',{kind,base64})).profile;await renderMyMedia();notice('Media saved with your Aura profile.');
+}
+$('#avatar-upload').onchange=e=>guard(()=>uploadMedia('avatar',e.target.files[0]),e.target);
+$('#video-upload').onchange=e=>guard(()=>uploadMedia('video',e.target.files[0]),e.target);

@@ -1,0 +1,20 @@
+{
+  "Aura.xcodeproj/project.pbxproj": "6648992097254e08d0b089b62299fb172bac47ffa9bb11451122bb511f7e150d",
+  "Aura.xcodeproj/project.xcworkspace/contents.xcworkspacedata": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
+  "Aura/ContentView.swift": "5040bbcbb6c8c450b955a00e68d1cd12bd30a2952479eb029c83124f92a514c9",
+  "Aura/Core/BLE/BLEBroadcaster.swift": "5b8ff3e421b949428f6a6a99e562fccee330030a8feedb030275de904156cfa4",
+  "Aura/Core/BLE/BLEScanner.swift": "5a648cdadb41452b9e1948e2f741cb327d9db3c6128943d82ac58b91e91316ed",
+  "Aura/Core/Solana/WalletManager.swift": "7cf5a1f676845261813de1b98ab31394f136a3c220d0a0f1fd07fcb7fb73b76c",
+  "Aura/Core/AR/ProfileCardEntity.swift": "81bcc5e31795d58fb4e82af6c2ad88404638dd79e6c7c602574020ab400226f8",
+  "Aura/Core/AR/ARAuraView.swift": "15e4f1db813a6a7f1e4e0bd12b19a1c2acc1228b80a02dd8dccf2e759b848ef4",
+  "Aura/Core/UWB/UWBSessionManager.swift": "c022d577894b74d17cae14944900ed1ce2d695a0bbabeae8420077d79dacb657",
+  "Aura/App/AuraApp.swift": "4ce604d2f0a257e84f2e6251900a8e3bdd29a047d11c27f4151f91502a0b6776",
+  "Aura/Features/Discovery/DiscoveryViewModel.swift": "386708615467ca260b5229b3ba5c3806f20720e9707199e66b850c21a2513980",
+  "Aura/Features/Discovery/DiscoveryView.swift": "afba6ef6c006a07ba8ea8b09bb8584a7c8b6a665c59201917ec5670d845bf34e",
+  "Aura/Features/Profile/ProfileSetupView.swift": "8bc864490559d15a644e110a81647282fc03697cea8eb97f049a913b7a2591b4",
+  "Aura/Assets.xcassets/Contents.json": "0fd49ba3c3585c709678e0046a821c3c60685ec7063720d30d3a3448be3a208b",
+  "Aura/Assets.xcassets/AppIcon.appiconset/Contents.json": "d776cfae1b33325f70befa1b0fc5e5420c660655603409e8588d94fd8fc6e112",
+  "Aura/Assets.xcassets/AccentColor.colorset/Contents.json": "9af65086fa30b49252fae1a1225731691de794f7775af74d71befeb507d12b7c",
+  "Aura/Models/AuraProfile.swift": "ee4461e7e7fd1cf2bc44dcd47e52a63ac90f97e982fd457a19a70fdd7f81723d",
+  "Aura/Services/APIService.swift": "031802764ce8657d3cc685f8c8b8b2a41db80a8a39c0b5539ca0f2a2ffd57b53"
+}

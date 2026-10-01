@@ -1,0 +1,37 @@
+node_modules/
+dist/
+data/
+.env
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+test-results/
+playwright-report/
+
+.build-*.log
+
+.toolchains/
+android/.gradle/
+android/local.properties
+android/**/build/
+
+# Local handoffs and generated release binaries
+/Aura-local-pilot.zip
+/artifacts/
+
+# Credentials, signing material and local database copies
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.p8
+*.pem
+*.mobileprovision
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+__pycache__/

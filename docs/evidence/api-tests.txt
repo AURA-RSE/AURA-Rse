@@ -1,0 +1,36 @@
+
+> aura-proximity@0.3.0 test
+> node --test tests/*.test.mjs
+
+✔ wallet signature required; proof bound to challenge and single-use (141.72875ms)
+✔ expired challenges and sessions are rejected (23.734333ms)
+✔ profiles cannot be enumerated; event membership and presence required (14.202041ms)
+✔ rotation invalidates old token; stealth revokes resolve and unsaved grants (13.149209ms)
+✔ private connections survive presence expiry but notes are not shared (16.01ms)
+✔ blocking removes access in both directions including saved connections (14.108708ms)
+✔ device pairing requires authenticated approval; exchange is single-use (11.324292ms)
+✔ positioning token relay requires mutual event presence and recipient consent (15.403958ms)
+✔ payment verification rejects pending, failed, wrong recipient, and wrong amount (18.946ms)
+✔ account export is isolated; deletion cascades; origin and unauthenticated access blocked (16.556875ms)
+✔ profile storage persists across process/store reopening (8.326ms)
+✔ uploaded media persists privately, supports replacement and deletion (12.098833ms)
+✔ malformed payment signature returns a client error (11.2615ms)
+✔ signed payment persists before uncertain RPC and cannot be submitted twice (83.604125ms)
+✔ signed transaction changing the reviewed amount is rejected before RPC (19.083708ms)
+✔ backup command produces a restorable SQLite snapshot (139.427583ms)
+✔ cleanup preserves unresolved submitted signatures for recovery (24.684666ms)
+✔ native payment preparation fixes sender, recipient, amount and reference in one unsigned transfer (33.80725ms)
+✔ native payment preparation rechecks expiry and blocking after blockhash lookup (15.713125ms)
+✔ native payment preparation rejects invalid upstream blockhash response without signing or submission (8.933333ms)
+✔ SOL amounts use exact integer conversion and pilot limits (0.978166ms)
+✔ profile input rejects unsafe links, invalid status, and unbounded text (0.235625ms)
+✔ spatial visibility requires a fresh measured transform (0.105875ms)
+✔ base58 rejects invalid characters and preserves zero public key (0.19ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1260.928458

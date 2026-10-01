@@ -1,0 +1,6 @@
+
+> aura-proximity@0.3.0 android:test
+> bash scripts/test-android-rules.sh
+
+PASS: 14 Android token/freshness/ATT-boundary assertions
+PASS: 416 Solana transaction/codec assertions against a real web3.js fixture (unfunded)
