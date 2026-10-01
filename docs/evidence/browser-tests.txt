@@ -1,5 +1,5 @@
 
-> aura-proximity@0.2.0 test:browser
+> aura-proximity@0.3.0 test:browser
 > node tests/browser.mjs
 
 PASS: desktop/mobile layout, wallet challenge, profile save, event join, saved connection, reviewed signed payment, verified receipt, durable avatar upload. RPC and wallets were test fixtures.

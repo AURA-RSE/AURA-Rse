@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { openStore } from './store.mjs';
+import { openStore, REPORT_RETENTION_MS, SCHEMA_VERSION } from './store.mjs';
 import { HttpError, fail, secret, hash, wallet, text, verifyWallet, profileInput, lamports } from './core.mjs';
 import bs58 from 'bs58';
 import { Transaction, SystemInstruction, SystemProgram, PublicKey } from '@solana/web3.js';
@@ -24,7 +24,8 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
   const canRead = (a,b) => a===b || (!blocked(a,b) && (get('SELECT 1 FROM access WHERE viewer=? AND target=? AND expires>?',a,b,now()) || get('SELECT 1 FROM connections WHERE owner=? AND target=?',a,b)));
   const session = w => {const token=secret(); run('INSERT INTO sessions VALUES(?,?,?)',hash(token),w,now()+7*86400000); return token;};
   const revokePresence = w => {run('DELETE FROM presence WHERE wallet=?',w);run('DELETE FROM access WHERE target=?',w);run('DELETE FROM ranging WHERE sender=? OR recipient=?',w,w);};
-  const sweep = () => {for(const table of ['challenges','sessions','presence','access','devices','ranging']) run(`DELETE FROM ${table} WHERE expires<=?`,now()); run('DELETE FROM payments WHERE signature IS NULL AND submitted_signature IS NULL AND expires<?',now()-86400000);};
+  const sweep = () => {for(const table of ['challenges','sessions','presence','access','devices','ranging','reports']) run(`DELETE FROM ${table} WHERE expires<=?`,now()); run('DELETE FROM payments WHERE signature IS NULL AND submitted_signature IS NULL AND expires<?',now()-86400000);};
+  sweep(); // Apply retention before serving requests, including after a backup restore.
   const interval=setInterval(sweep,30000);interval.unref();
   const server = createServer(async (req,res) => {
     const respond=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
@@ -48,7 +49,7 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
       for(const oldKey of limits.keys())if(!oldKey.endsWith(':'+slot))limits.delete(oldKey);
       limits.set(key,(limits.get(key)||0)+1);
       if(limits.get(key)>(verified?1800:120)) fail(429,'Too many requests; try again shortly');
-      if(path==='/api/health' && req.method==='GET') return respond(200,{status:'ok',version:'0.3.0',cluster:'devnet',schemaVersion:2});
+      if(path==='/api/health' && req.method==='GET') return respond(200,{status:'ok',version:'0.3.0',cluster:'devnet',schemaVersion:SCHEMA_VERSION});
       let body={};
       if(['POST','PUT','DELETE'].includes(req.method)) {
         let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>(path==='/api/media'?29*1024*1024:16384))fail(413,'Request too large');chunks.push(chunk);}
@@ -138,7 +139,9 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
       if(route==='DELETE /api/blocks'){run('DELETE FROM blocks WHERE owner=? AND target=?',me,wallet(body.wallet));return respond(200,{ok:true});}
       if(route==='POST /api/reports') {
         const target=wallet(body.wallet);if(target===me||!canRead(me,target))fail(404,'Participant unavailable');
-        run('INSERT INTO reports VALUES(?,?,?,?,?)',secret(),me,target,text(body.reason,1000,true),now());return respond(201,{ok:true,message:'Report stored for operator review; no automated moderation is claimed.'});
+        const created=now(),expires=created+REPORT_RETENTION_MS;
+        run('INSERT INTO reports(id,owner,target,reason,created,expires) VALUES(?,?,?,?,?,?)',secret(),me,target,text(body.reason,1000,true),created,expires);
+        return respond(201,{ok:true,expires,message:'Report stored for operator review for 90 days, including after account deletion. No automated moderation is claimed.'});
       }
       if(route==='POST /api/ranging') {
         const target=wallet(body.wallet);if(target===me||!canRead(me,target))fail(404,'Participant unavailable');
@@ -245,7 +248,7 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
         const current=profile(me);delete current.wallet;delete current.updated;current[kind==='avatar'?'avatarMediaId':'videoMediaId']=null;
         run('DELETE FROM media WHERE owner=? AND kind=?',me,kind);run('UPDATE profiles SET data=?,updated=? WHERE wallet=?',JSON.stringify(current),now(),me);return respond(200,{profile:profile(me)});
       }
-      if(route==='GET /api/account/export')return respond(200,{profile:profile(me),connections:all('SELECT target,note,created FROM connections WHERE owner=?',me),events:all('SELECT event FROM members WHERE wallet=?',me),blocks:all('SELECT target FROM blocks WHERE owner=?',me),reports:all('SELECT target,reason,created FROM reports WHERE owner=?',me),payments:all('SELECT * FROM payments WHERE sender=?',me),media:all('SELECT id,kind,mime,bytes FROM media WHERE owner=?',me).map(m=>({...m,bytes:undefined,base64:Buffer.from(m.bytes).toString('base64')}))});
+      if(route==='GET /api/account/export')return respond(200,{profile:profile(me),connections:all('SELECT target,note,created FROM connections WHERE owner=?',me),events:all('SELECT event FROM members WHERE wallet=?',me),blocks:all('SELECT target FROM blocks WHERE owner=?',me),reports:all('SELECT target,reason,created,expires FROM reports WHERE owner=? AND expires>?',me,now()),payments:all('SELECT * FROM payments WHERE sender=?',me),media:all('SELECT id,kind,mime,bytes FROM media WHERE owner=?',me).map(m=>({...m,bytes:undefined,base64:Buffer.from(m.bytes).toString('base64')}))});
       if(route==='DELETE /api/account') {
         if(body.confirm!=='DELETE')fail(400,'Explicit deletion confirmation required');
         run('DELETE FROM challenges WHERE wallet=?',me);run('DELETE FROM profiles WHERE wallet=?',me);return respond(200,{ok:true});

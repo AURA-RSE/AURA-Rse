@@ -2,35 +2,41 @@
 > aura-proximity@0.3.0 test
 > node --test tests/*.test.mjs
 
-✔ wallet signature required; proof bound to challenge and single-use (141.72875ms)
-✔ expired challenges and sessions are rejected (23.734333ms)
-✔ profiles cannot be enumerated; event membership and presence required (14.202041ms)
-✔ rotation invalidates old token; stealth revokes resolve and unsaved grants (13.149209ms)
-✔ private connections survive presence expiry but notes are not shared (16.01ms)
-✔ blocking removes access in both directions including saved connections (14.108708ms)
-✔ device pairing requires authenticated approval; exchange is single-use (11.324292ms)
-✔ positioning token relay requires mutual event presence and recipient consent (15.403958ms)
-✔ payment verification rejects pending, failed, wrong recipient, and wrong amount (18.946ms)
-✔ account export is isolated; deletion cascades; origin and unauthenticated access blocked (16.556875ms)
-✔ profile storage persists across process/store reopening (8.326ms)
-✔ uploaded media persists privately, supports replacement and deletion (12.098833ms)
-✔ malformed payment signature returns a client error (11.2615ms)
-✔ signed payment persists before uncertain RPC and cannot be submitted twice (83.604125ms)
-✔ signed transaction changing the reviewed amount is rejected before RPC (19.083708ms)
-✔ backup command produces a restorable SQLite snapshot (139.427583ms)
-✔ cleanup preserves unresolved submitted signatures for recovery (24.684666ms)
-✔ native payment preparation fixes sender, recipient, amount and reference in one unsigned transfer (33.80725ms)
-✔ native payment preparation rechecks expiry and blocking after blockhash lookup (15.713125ms)
-✔ native payment preparation rejects invalid upstream blockhash response without signing or submission (8.933333ms)
-✔ SOL amounts use exact integer conversion and pilot limits (0.978166ms)
-✔ profile input rejects unsafe links, invalid status, and unbounded text (0.235625ms)
-✔ spatial visibility requires a fresh measured transform (0.105875ms)
-✔ base58 rejects invalid characters and preserves zero public key (0.19ms)
-ℹ tests 24
+✔ wallet signature required; proof bound to challenge and single-use (52.08425ms)
+✔ expired challenges and sessions are rejected (11.647458ms)
+✔ profiles cannot be enumerated; event membership and presence required (10.370458ms)
+✔ rotation invalidates old token; stealth revokes resolve and unsaved grants (11.2485ms)
+✔ private connections survive presence expiry but notes are not shared (10.203333ms)
+✔ blocking removes access in both directions including saved connections (10.752833ms)
+✔ device pairing requires authenticated approval; exchange is single-use (7.925167ms)
+✔ positioning token relay requires mutual event presence and recipient consent (12.092666ms)
+✔ payment verification rejects pending, failed, wrong recipient, and wrong amount (12.1165ms)
+✔ account export is isolated; deletion cascades; origin and unauthenticated access blocked (9.535542ms)
+✔ profile storage persists across process/store reopening (10.900458ms)
+✔ uploaded media persists privately, supports replacement and deletion (9.063375ms)
+✔ malformed payment signature returns a client error (8.324958ms)
+✔ signed payment persists before uncertain RPC and cannot be submitted twice (59.913417ms)
+✔ signed transaction changing the reviewed amount is rejected before RPC (12.089ms)
+✔ backup command produces a restorable SQLite snapshot (95.276458ms)
+✔ cleanup preserves unresolved submitted signatures for recovery (8.120334ms)
+✔ native payment preparation fixes sender, recipient, amount and reference in one unsigned transfer (16.328583ms)
+✔ native payment preparation rechecks expiry and blocking after blockhash lookup (9.264041ms)
+✔ native payment preparation rejects invalid upstream blockhash response without signing or submission (7.678042ms)
+✔ reports survive target deletion and detach a deleted reporter without exposing reports to others (13.862292ms)
+✔ reports expire at the original deadline and are hidden from export before the next sweep (10.200166ms)
+✔ recipient deletion preserves another sender payment history but removes profile and media (8.425708ms)
+✔ SOL amounts use exact integer conversion and pilot limits (1.007125ms)
+✔ profile input rejects unsafe links, invalid status, and unbounded text (0.225834ms)
+✔ spatial visibility requires a fresh measured transform (0.517208ms)
+✔ base58 rejects invalid characters and preserves zero public key (0.246875ms)
+✔ schema v1 migration preserves reports and original retention deadlines across reopen (21.773708ms)
+✔ schema v2 migration preserves reports and original retention deadlines across reopen (17.085458ms)
+✔ store rejects an unknown future schema (6.768667ms)
+ℹ tests 30
 ℹ suites 0
-ℹ pass 24
+ℹ pass 30
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1260.928458
+ℹ duration_ms 653.439958

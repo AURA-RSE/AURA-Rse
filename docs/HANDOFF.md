@@ -9,7 +9,9 @@ The web companion runs at `http://localhost:4317` when `npm start` is active. It
 1. `docs/CAPABILITIES.md`: implemented features and remaining validation.
 2. `docs/ARCHITECTURE.md`: storage, identities, media, sessions, payments, and the no-custom-contract decision.
 3. `docs/evidence/VERIFICATION.md`: completed checks and their limits.
-4. `docs/PILOT.md`: physical-device checks and the measured small-room pilot.
+4. `docs/DEVICE-VALIDATION.md`: hardware prerequisites, recording steps and pending device checks.
+5. `docs/PILOT.md`: physical-device checks and the measured small-room pilot.
+6. `docs/REPORT-RETENTION.md`: safety-report lifetime, deletion exceptions and operator responsibilities.
 
 ## Next evidence priorities
 

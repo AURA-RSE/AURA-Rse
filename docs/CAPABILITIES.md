@@ -24,8 +24,8 @@ This matrix tracks the implementation and validation of Aura’s mobile apps and
 | Cross-platform discovery | Shared GATT UUIDs and token protocol implemented in both clients | Must demonstrate iOS↔Android in both directions |
 | Cross-platform UWB | Research gate only | Never infer interoperability from both phones advertising UWB |
 | Saved connections | Durable owner-scoped records, private notes, web removal | Privacy tests; iOS/Android reads/writes implemented |
-| Blocking and reporting | Bilateral access denial, ranging revocation, reports stored | No automated abuse detection; pilot operator workflow required |
-| Account export/deletion | JSON export incl. own uploaded media; cascading active-record deletion | Tests; on-chain transfers remain public; backup erasure lifecycle pending |
+| Blocking and reporting | Bilateral access denial, ranging revocation, reports retained for 90 days independently of target deletion | API expiry/deletion/isolation tests and v1/v2 migration checks; no automated abuse detection or staffed moderation |
+| Account export/deletion | JSON export incl. own uploaded media; account-owned data deletion; bounded safety-report exception | Tests cover reporter unlinking and other senders’ retained payment history; chain data remains public; backup erasure lifecycle pending |
 | Solana names / credentials / NFT context | Not implemented | Verified provenance + consent + display design needed; no self-entered credential portrayed as verified |
 | SDK | Reusable transport client, tests, example, protocol documentation | Local package only; Swift/Kotlin packaging and independent integration trials pending |
 | Event analytics | No production telemetry system | Pilot observation template available; consented aggregate instrumentation still required |

@@ -30,11 +30,21 @@ The API is intentionally small and runs on one Node process for a development pi
 | Temporary read grant | SQLite | Specific viewer→profile | Two minutes; revoked on target hide/block |
 | Positioning handshake | SQLite | Sender and recipient only | Two minutes; stop/hide/block removes it |
 | Connection/private note | SQLite | Note author only | Until author removes it or relevant account deletion |
-| Reports | SQLite | Reporter in personal export, local operator with DB access | Until deletion; production retention policy pending |
-| Payment intent and signature | SQLite | Sender | Until account deletion; unsigned abandoned intents swept after expiry + 24h |
+| Reports | SQLite | Reporter in personal export before expiry; authorized local operator with DB access | 90 days from creation, independent of target deletion; reporter link cleared on reporter deletion |
+| Payment intent and signature | SQLite | Sender | Until sender account deletion; recipient wallet remains after recipient deletion; unsigned abandoned intents swept after expiry + 24h |
 | Confirmed transaction | Solana devnet | Public chain data | Not erasable by Aura |
 
 The database is not application-encrypted: file permissions and host disk encryption are the current local protection. Do not describe private notes as end-to-end encrypted. HTTPS is required for release deployment. Debug HTTP is limited to trusted local tests with devnet accounts.
+
+## Account deletion and safety-report retention
+
+Deletion removes the account's profile, uploaded media, sessions, challenges, memberships, owned events, connections/notes, blocks, ranging state and sender-owned payment records. Connections targeting the account are removed too. It does not erase every occurrence of the wallet: other senders' payment records can retain it, and chain transactions remain public.
+
+Safety reports are a bounded exception. Schema v3 stores the target wallet, report reason (maximum 1,000 characters), creation time and expiry independently of the target's profile. Deleting the target does not delete these reports. Deleting the reporter sets the reporter account link to null; it does not erase information they included in the reason. Re-registering that wallet does not restore ownership of old reports. Reports are never exposed to their targets or other participants through the API.
+
+The pilot retention window is 90 days from the original creation time. The v1/v2 migration preserves that deadline rather than restarting it. Expired reports are excluded from exports immediately, removed from active database rows at startup and on the 30-second cleanup sweep, and not extended by account deletion. This is an operational pilot default, subject to privacy and security review before deployment; it is not a claim of legal compliance or an automatic moderation service.
+
+Deleting rows is not secure erasure of SQLite pages, WAL files or backups. The backup lifecycle remains an operator responsibility. Restoring a database runs expiry cleanup before serving requests, but an older backup can still restore deleted accounts or reporter links: reconcile deletions before reopening access. Establish backup expiry, deletion reconciliation and operator access controls before a participant pilot. See [operator procedure](REPORT-RETENTION.md).
 
 ## Why there is no custom contract
 

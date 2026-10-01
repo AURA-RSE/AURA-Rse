@@ -76,3 +76,60 @@ test('native payment preparation rejects invalid upstream blockhash response wit
  value={blockhash:bs58.encode(randomBytes(32)),lastValidBlockHeight:-1};assert.equal((await f.request('/api/payments/prepare',{id:p.id},a.token)).status,502);
  assert.equal(f.db.prepare('SELECT submitted_signature FROM payments WHERE id=?').get(p.id).submitted_signature,null);
 });
+
+
+test('reports survive target deletion and detach a deleted reporter without exposing reports to others', async t => {
+ const f=await fixture(t),a=await f.login(),b=await f.login('Bob'),c=await f.login('Carol');
+ assert.equal((await f.request('/api/reports',{wallet:b.wallet,reason:'Unknown participant'},a.token)).status,404);
+ await f.discover(a,b);
+ const result=await f.request('/api/reports',{wallet:b.wallet,reason:'Repeated unwanted contact'},a.token);
+ assert.equal(result.status,201);
+ const initial=f.db.prepare('SELECT * FROM reports').get();
+ assert.equal(result.expires,initial.created+90*86400000);
+ assert.equal((await f.request('/api/account/export',undefined,b.token)).reports.length,0);
+ assert.equal((await f.request('/api/account/export',undefined,c.token)).reports.length,0);
+ assert.equal((await f.request('/api/account',{confirm:'DELETE'},b.token,'DELETE')).status,200);
+ const exported=(await f.request('/api/account/export',undefined,a.token)).reports;
+ assert.equal(exported.length,1);assert.equal(exported[0].target,b.wallet);
+ assert.equal(exported[0].expires,initial.expires);
+ assert.equal((await f.request('/api/account',{confirm:'DELETE'},a.token,'DELETE')).status,200);
+ const retained=f.db.prepare('SELECT * FROM reports').get();
+ assert.equal(retained.owner,null);assert.equal(retained.target,b.wallet);
+ assert.equal(retained.reason,initial.reason);assert.equal(retained.expires,initial.expires);
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE wallet IN (?,?)').get(a.wallet,b.wallet).n,0);
+ const challenge=await f.request('/api/auth/challenge',{wallet:a.wallet});
+ const again=await f.request('/api/auth/verify',{id:challenge.id,signature:sign(null,Buffer.from(challenge.message),a.key).toString('base64')});
+ assert.equal((await f.request('/api/account/export',undefined,again.token)).reports.length,0);
+ assert.equal(f.db.prepare('SELECT owner FROM reports').get().owner,null);
+ assert.deepEqual(f.db.prepare('PRAGMA foreign_key_check').all(),[]);
+});
+
+test('reports expire at the original deadline and are hidden from export before the next sweep', async t => {
+ const f=await fixture(t),a=await f.login(),b=await f.login('Bob');await f.discover(a,b);
+ await f.request('/api/reports',{wallet:b.wallet,reason:'A bounded incident record'},a.token);
+ f.advance(90*86400000-1);f.sweep();
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM reports').get().n,1);
+ const challenge=await f.request('/api/auth/challenge',{wallet:a.wallet});
+ const again=await f.request('/api/auth/verify',{id:challenge.id,signature:sign(null,Buffer.from(challenge.message),a.key).toString('base64')});
+ assert.equal((await f.request('/api/account/export',undefined,again.token)).reports.length,1);
+ f.advance(1);
+ assert.equal((await f.request('/api/account/export',undefined,again.token)).reports.length,0);
+ f.sweep();assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM reports').get().n,0);
+});
+
+test('recipient deletion preserves another sender payment history but removes profile and media', async t => {
+ const f=await fixture(t),a=await f.login(),b=await f.login('Bob');await f.discover(a,b);
+ await f.request('/api/connections',{wallet:b.wallet,note:'Delete this connection'},a.token,'PUT');
+ await f.request('/api/media',{kind:'avatar',base64:Buffer.from('89504e470d0a1a0a00000000','hex').toString('base64')},b.token);
+ const payment=await f.request('/api/payments',{wallet:b.wallet,amount:'0.1'},a.token);
+ const signature=bs58.encode(randomBytes(64));
+ f.db.prepare('UPDATE payments SET submitted_signature=? WHERE id=?').run(signature,payment.id);
+ assert.equal((await f.request('/api/account',{confirm:'DELETE'},b.token,'DELETE')).status,200);
+ const history=(await f.request('/api/payments',undefined,a.token)).payments;
+ assert.equal(history.length,1);assert.equal(history[0].recipient,b.wallet);assert.equal(history[0].submitted_signature,signature);
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM media').get().n,0);
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM connections').get().n,0);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
+ assert.equal((await f.request('/api/account',{confirm:'DELETE'},a.token,'DELETE')).status,200);
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM payments').get().n,0);
+});

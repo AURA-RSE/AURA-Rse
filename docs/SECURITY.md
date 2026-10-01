@@ -13,7 +13,7 @@ This implementation has automated regression checks but has not received an inde
 - Origin checks, restrictive CSP, no-referrer, nosniff, no auth cookies.
 - Devnet-only RPC target and pilot amount cap. Exact integer lamports.
 - Signed transfer checked against the intent before submission. Signature stored before RPC I/O. Confirmation checked independently.
-- Media signature/type/size checks and protected retrieval; account deletion cascades.
+- Media signature/type/size checks and protected retrieval; account-owned data deletion with documented safety-report and payment-history exceptions.
 
 ## Remaining risks / deployment gates
 
@@ -24,10 +24,10 @@ This implementation has automated regression checks but has not received an inde
 - Debug LAN HTTP is not confidential. Production requires HTTPS and external hardening.
 - SQLite backup access, retention, restore verification, server-side encryption choices, operational monitoring and distributed rate limiting are not completed.
 - Upload checks recognize container signatures, not safe decoding, exact duration, codecs, transcoding or malicious payload scanning. Video duration is checked in the web client only. Public upload deployment requires a hardened media pipeline and resource quotas.
-- Reports are persisted; there is no staffed moderation service in this local build. Establish an operator process before a pilot.
+- Safety reports survive target deletion for a fixed 90-day window; reporter deletion clears the reporter account link. Reasons can contain identifying information. There is no staffed moderation service. Apply the [operator procedure](REPORT-RETENTION.md) before a pilot.
 - Event codes can be shared; stronger invites/organizer roles, deletion/closure and anti-abuse quotas remain work.
 - Session theft enables account actions until expiry/revocation. Sensitive account deletion currently uses active-session authorization and explicit confirmation, not a fresh wallet signature.
 - SOL-only devnet; native mobile wallet return flows and SPL support are pending. A definitive failed submission currently requires operator/user review before a new intent; no automatic retry/re-sign path.
-- Some transaction metadata remains inherently public on-chain even after Aura account deletion.
+- Other senders' payment histories can retain a deleted recipient's wallet. Chain transactions remain public. Report expiry removes active rows, not SQLite/WAL remnants or backups; backup expiry and deletion reconciliation after restore remain deployment gates.
 
 Before public deployment: independent security/privacy review; request/body/concurrency quotas; strict HTTPS; backup/restore drill; dependency review; live wallet testing; physical radio/AR validation; abuse response; documented retention and participant consent.

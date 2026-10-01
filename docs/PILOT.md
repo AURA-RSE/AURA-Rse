@@ -1,5 +1,7 @@
 # Real-device pilot and evidence plan
 
+Start with the [device validation checklist](DEVICE-VALIDATION.md) and assign an operator using the [report-retention procedure](REPORT-RETENTION.md). Record failures as failures; the checklist does not establish device compatibility.
+
 ## Two-device smoke test
 
 Use different test wallets and the same event. Record device models, OS versions, app build, server revision/source checksum, network, and physical layout. Do not use actual personal funds.
@@ -15,7 +17,7 @@ Use different test wallets and the same event. Record device models, OS versions
 9. Hide, block, background, or revoke pairing. Measure disappearance. Offline server presence may remain resolvable until 90-second expiry; cached downloaded data cannot be recalled.
 10. Create a devnet SOL payment, review full recipient, sign in an actual supported wallet, and independently open the devnet explorer receipt. Confirm no test fixture is involved.
 11. Disconnect networking immediately after signing/submission. Check the stored signature; do not create a second payment until its outcome is established.
-12. Export and delete an account. Verify active records/media disappear and explain that chain transactions are public.
+12. Export and delete a test account. Verify its profile/media/sessions disappear. Verify existing safety reports survive until their original 90-day deadline and reporter deletion clears the owner link. Check the other sender's payment history still retains the deleted recipient wallet. Explain these exceptions, public chain records and backup limits before participant consent.
 
 ## Small-room pilot
 

@@ -1,15 +1,13 @@
-Local machine paths anonymized; diagnostics and results are unchanged.
-
-android/app/build.gradle:23: Warning: A newer version of com.solanamobile:mobile-wallet-adapter-clientlib than 2.0.8 is available: 2.2.0 [GradleDependency]
+<AURA_ROOT>/android/app/build.gradle:23: Warning: A newer version of com.solanamobile:mobile-wallet-adapter-clientlib than 2.0.8 is available: 2.2.0 [GradleDependency]
     implementation 'com.solanamobile:mobile-wallet-adapter-clientlib:2.0.8'
                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-android/app/build.gradle:24: Warning: A newer version of androidx.test:runner than 1.6.2 is available: 1.7.0 [GradleDependency]
+<AURA_ROOT>/android/app/build.gradle:24: Warning: A newer version of androidx.test:runner than 1.6.2 is available: 1.7.0 [GradleDependency]
     androidTestImplementation 'androidx.test:runner:1.6.2'
                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-android/app/build.gradle:25: Warning: A newer version of androidx.test:core than 1.6.1 is available: 1.7.0 [GradleDependency]
+<AURA_ROOT>/android/app/build.gradle:25: Warning: A newer version of androidx.test:core than 1.6.1 is available: 1.7.0 [GradleDependency]
     androidTestImplementation 'androidx.test:core:1.6.1'
                               ~~~~~~~~~~~~~~~~~~~~~~~~~~
-android/app/build.gradle:26: Warning: A newer version of androidx.test.ext:junit than 1.2.1 is available: 1.3.0 [GradleDependency]
+<AURA_ROOT>/android/app/build.gradle:26: Warning: A newer version of androidx.test.ext:junit than 1.2.1 is available: 1.3.0 [GradleDependency]
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -20,7 +18,7 @@ android/app/build.gradle:26: Warning: A newer version of androidx.test.ext:junit
    However, you may simply not be aware that a more recent version is
    available, and that is what this lint check helps find.
 
-android/app/src/debug/res/xml/network_security_config.xml:1: Warning: Insecure Base Configuration [InsecureBaseConfiguration]
+<AURA_ROOT>/android/app/src/debug/res/xml/network_security_config.xml:1: Warning: Insecure Base Configuration [InsecureBaseConfiguration]
 <network-security-config><base-config cleartextTrafficPermitted="true" /></network-security-config>
                                                                  ~~~~
 

@@ -1,6 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
+export const REPORT_RETENTION_MS = 90 * 86400000;
+export const SCHEMA_VERSION = 3;
+
 export function openStore(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive:true, mode:0o700 });
   const db = new DatabaseSync(path);
@@ -26,9 +29,35 @@ export function openStore(path) {
   CREATE INDEX IF NOT EXISTS ranging_recipient ON ranging(recipient,expires);
   `);
   const version = db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v;
-  if (version > 2) throw new Error('Unsupported database schema');
+  if (version > SCHEMA_VERSION) { db.close(); throw new Error('Unsupported database schema'); }
   if (version < 2) {
     db.exec('BEGIN IMMEDIATE; ALTER TABLE payments ADD COLUMN submitted_signature TEXT; INSERT INTO schema_version VALUES(2); COMMIT;');
+  }
+  if (version < 3) {
+    // Preserve abuse reports independently of the reported account. Deleting the
+    // reporter clears their account link; the original expiry never resets.
+    try {
+      db.exec(`BEGIN IMMEDIATE;
+        CREATE TABLE reports_v3(
+          id TEXT PRIMARY KEY,
+          owner TEXT REFERENCES profiles(wallet) ON DELETE SET NULL,
+          target TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created INTEGER NOT NULL,
+          expires INTEGER NOT NULL
+        );`);
+      db.prepare(`INSERT INTO reports_v3(id,owner,target,reason,created,expires)
+        SELECT id,owner,target,reason,created,created+? FROM reports`).run(REPORT_RETENTION_MS);
+      db.exec(`DROP TABLE reports;
+        ALTER TABLE reports_v3 RENAME TO reports;
+        CREATE INDEX reports_expiry ON reports(expires);
+        INSERT INTO schema_version VALUES(3);
+        COMMIT;`);
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch { /* BEGIN may itself have failed. */ }
+      db.close();
+      throw error;
+    }
   }
   return db;
 }

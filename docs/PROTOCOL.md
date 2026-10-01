@@ -23,7 +23,7 @@ All authenticated requests use `Authorization: Bearer <session>`. JSON request/r
 | POST `/api/profiles/read` `{wallet}` | Read an already-authorized profile |
 | GET / PUT / DELETE `/api/connections` | Own saved profiles; write `{wallet,note}`; delete `{wallet}` |
 | GET / POST / DELETE `/api/blocks` | Read blocks; block/unblock `{wallet}` |
-| POST `/api/reports` `{wallet,reason}` | Store a report for operator review |
+| POST `/api/reports` `{wallet,reason}` | Store a report for operator review; returns `expires` (epoch ms), fixed at creation + 90 days |
 | POST `/api/ranging` `{wallet,discoveryToken}` | Request one peer; base64 archived NI token |
 | GET `/api/ranging` | Own live requests: sender_token, recipient_token, peer, expires |
 | POST `/api/ranging/accept` `{id,discoveryToken}` | Recipient accepts |
@@ -36,10 +36,12 @@ All authenticated requests use `Authorization: Bearer <session>`. JSON request/r
 | GET `/api/media/:id` | Protected raw bytes, correct media MIME |
 | DELETE `/api/media` `{kind}` | Delete own avatar/video |
 | GET `/api/account/export` | Owner data + base64 uploaded media |
-| DELETE `/api/account` `{confirm:"DELETE"}` | Remove active account records |
+| DELETE `/api/account` `{confirm:"DELETE"}` | Delete account-owned records; unlink reporter identity; retain unexpired safety reports and other senders’ payment histories |
 | POST `/rpc` | Authenticated read-only devnet RPC subset for browser transaction construction |
 
 Profile fields: `name`, `role`, `project`, `bio`, `link`, `video`, `intents`, `status`. Status values: `open`, `heads-down`, `stealth`. Server owns `wallet`, `updated`, `avatarMediaId`, `videoMediaId`. Neither links nor project names are externally verified.
+
+Account exports include only the caller's unexpired reports, with `target`, `reason`, `created` and `expires`. Deleting a reporter clears the report's owner link; signing up again does not reclaim those reports. No API exposes reports to their targets. See [retention and deletion semantics](REPORT-RETENTION.md).
 
 ## Radio wire format
 

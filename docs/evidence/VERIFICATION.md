@@ -1,5 +1,16 @@
 # Verification record
 
+## 2026-10-01 — bounded safety-report retention and deletion semantics
+
+- **30 API/core/store tests passed.** New checks cover target deletion, reporter unlinking, re-registration isolation, export isolation, exact 90-day expiry, startup cleanup, schema v1/v2 migration, future-schema rejection and retained recipient wallets in other senders' payment history. See `api-tests.txt`.
+- Schema v3 preserves safety reports until their original expiry even after target deletion. Reporter deletion clears the account link. Active rows expire at creation + 90 days, with startup and 30-second cleanup; exports enforce expiry independently of the sweep. SQLite/WAL remnants and backup erasure remain outside this guarantee.
+- Web build and isolated Chrome integration **passed**; generated wallets and mocked RPC remain test fixtures. Updated privacy notices and workspace screenshot included. See `browser-tests.txt`.
+- Unsigned generic iPhone build **passed** after the reporting notice update. Existing derived-data paths emitted stale-file warnings; no physical install, signing or radio validation was performed.
+- Android debug APK build **passed**. Lint remains **0 errors, 5 warnings** (four dependency upgrades and debug-only cleartext transport). See `android-build.txt` and `android-lint.txt`.
+- The existing Android emulator/transaction-integrity results below are earlier runs, not new device evidence from this change.
+- Physical BLE, actual MWA signing/devnet receipt and two-iPhone positioning remain pending. No Android device was connected at the USB check; the Apple device query returned a CoreDevice provider error, so iPhone connection status was not established.
+- Added a real-device checklist, blank measurement CSV and operator retention procedure. These are plans and procedures, not completed field results.
+
 ## 2026-10-01 — Aura v0.3 native Android wallet groundwork
 
 - **24 API/core tests passed.** Native payment preparation fixes the sender, recipient, amount and reference; tests check expiry/block changes during RPC, invalid upstream data, signed submission and recovery.

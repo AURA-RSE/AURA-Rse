@@ -1,0 +1,1 @@
+run_id,date_utc,commit,build_sha256,platform,device_model,os_version,peer_model,peer_os,wallet_and_version,scenario,status,attempts,successes,wrong_identity_count,median_seconds,p95_seconds,reference_distance_m,reported_distance_m,receipt_signature,evidence_path,notes
