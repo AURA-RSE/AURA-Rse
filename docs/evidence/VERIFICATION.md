@@ -1,5 +1,11 @@
 # Verification record
 
+## 2026-10-02 — Android saved-connection feedback
+
+- Saving a connection now shows progress, success and errors inside the open profile panel. A failed save retains the note; an in-flight save disables duplicate submissions.
+- Four isolated Android emulator instrumentation tests passed, including persisting a note through the real fixture API and retaining an edited note after a rejected update. The test fixture was corrected to avoid blocking the same participant twice.
+- Android debug build and lint passed (no errors; five existing warnings). Physical installation of this feedback update remains separate from these checks.
+
 ## 2026-10-02 — physical Android sign-in and event-join feedback
 
 - **Physical Samsung SM-A055F, Android 15:** the user approved Aura's native Solflare sign-in and reached the profile screen. The isolated backend verified a created profile and active authenticated session. App/wallet versions and the tested APK checksum are recorded in `physical-wallet-signin.json`. This is manual device evidence, not an independently witnessed audit or a payment receipt.
