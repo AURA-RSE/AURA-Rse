@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import AVFoundation
 struct DiscoveryView: View {
     @ObservedObject var model: DiscoveryViewModel
     @State private var query = ""
@@ -16,9 +17,9 @@ struct DiscoveryView: View {
             Text("Builders around you.").font(.system(size:36,weight:.semibold)).tracking(-1)
             Text("Find a collaborator. Meet your next team.").font(.subheadline).foregroundStyle(.secondary)
             Picker("Event",selection:$model.selectedEvent) { Text("Choose an event").tag("");ForEach(model.events) { Text($0.name).tag($0.id) } }.disabled(model.active)
+            Button { showCamera = true } label: { Label("Open room camera",systemImage:"camera.fill").frame(maxWidth:.infinity) }.buttonStyle(.borderedProminent).foregroundStyle(.black)
             HStack {
                 Button(model.active ? "Pause discovery" : "Start discovery ↗") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
-                Button { showCamera = true } label: { Image(systemName:"camera.viewfinder").font(.title2) }.disabled(!model.active)
             }
             DiscoveryStatus(broadcaster:model.broadcaster,scanner:model.scanner,message:model.statusMessage)
             ForEach(model.requests) { r in VStack(alignment:.leading,spacing:10) {
@@ -42,7 +43,7 @@ struct DiscoveryView: View {
                     Spacer();Image(systemName:"arrow.up.right").foregroundStyle(.secondary)
                 }.padding(18).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:18)) } .buttonStyle(.plain) }
             }
-        }.padding(24) }.background(AuraTheme.background).navigationBarHidden(true).sheet(isPresented:$showCamera) { CameraSheet(model:model,positioning:model.positioning) } }
+        }.padding(24) }.background(AuraTheme.background).navigationBarHidden(true).fullScreenCover(isPresented:$showCamera) { CameraSheet(model:model,positioning:model.positioning) } }
     }
 }
 struct DiscoveryStatus:View {
@@ -55,10 +56,54 @@ struct CameraSheet:View {
     @ObservedObject var model:DiscoveryViewModel
     @ObservedObject var positioning:UWBSessionManager
     @Environment(\.dismiss) var dismiss
-    var body:some View { ZStack(alignment:.bottom) {
-        ARAuraView(positioning:positioning,name:model.peers.first(where:{$0.id==positioning.peerID})?.profile.name ?? "Participant").ignoresSafeArea()
-        VStack(spacing:12) { Text("MEASURED DEVICE POSITION").font(.caption2).tracking(2);Text(positioning.message).font(.subheadline);if let distance = positioning.distance { Text("\(distance,specifier:"%.2f") m").font(.title) };Button("Back to nearby list") { dismiss() }.buttonStyle(.borderedProminent).foregroundStyle(.black) }.padding(24).frame(maxWidth:.infinity).background(.ultraThinMaterial)
-    }.onDisappear { Task { await model.endPositioning() } } }
+    @Environment(\.scenePhase) private var phase
+    @State private var cameraAllowed = false
+    @State private var permissionChecked = false
+    @State private var cameraPeer:AuraProfile?
+    var body:some View { ZStack {
+        Color.black.ignoresSafeArea()
+        if cameraAllowed && phase == .active {
+            ARAuraView(positioning:positioning,name:model.peers.first(where:{$0.id==positioning.peerID})?.profile.name ?? "Participant",select:{
+                cameraPeer = model.peers.first(where:{$0.id==positioning.peerID})?.profile
+            }).ignoresSafeArea()
+        } else if permissionChecked {
+            ContentUnavailableView("Camera access is off",systemImage:"camera",description:Text("Allow Camera for Aura in Settings, or use nearby profiles without it.")).foregroundStyle(.white)
+        }
+        VStack(alignment:.leading,spacing:16) {
+            HStack {
+                VStack(alignment:.leading,spacing:5) { Text("aura◌").font(.title.bold());Text("ROOM CAMERA · LIVE ONLY").font(.caption2).tracking(2) }
+                Spacer()
+                Button { dismiss() } label: { Image(systemName:"xmark").padding(12).background(.black.opacity(0.55),in:Circle()) }.accessibilityLabel("Close room camera")
+            }.padding().background(.black.opacity(0.55))
+            Spacer()
+            VStack(alignment:.leading,spacing:12) {
+                HStack { Text(model.active ? "\(model.peers.count) nearby" : "Discovery paused").font(.headline);Spacer();Text("DEVNET").font(.caption2).foregroundStyle(AuraTheme.lime) }
+                Text(positioning.worldTransform == nil ? "Nearby profiles · positions not yet measured" : "Measured device marker · tap to open profile").font(.caption).foregroundStyle(.secondary)
+                if positioning.peerID != nil { Text(positioning.message).font(.caption);if let distance=positioning.distance { Text("\(distance,specifier:"%.2f") m to device").font(.caption.monospaced()) } }
+                if let error=model.error { Text(error).font(.caption).foregroundStyle(.orange) }
+                ScrollView(.horizontal,showsIndicators:false) { HStack(spacing:12) {
+                    ForEach(model.peers.sorted{$0.profile.name<$1.profile.name}) { peer in
+                        Button { cameraPeer=peer.profile } label: {
+                            HStack(spacing:10) { NearbyAvatar(profile:peer.profile,size:40);VStack(alignment:.leading,spacing:4) { Text(peer.profile.name).font(.headline);Text(peer.profile.role).font(.caption);Text(peer.profile.project).font(.caption).foregroundStyle(AuraTheme.lime) } }
+                            .frame(width:220,alignment:.leading).padding(14).background(.white.opacity(0.09),in:RoundedRectangle(cornerRadius:20))
+                        }.buttonStyle(.plain).accessibilityHint("Open this nearby profile; its camera position is not implied")
+                    }
+                } }
+                if model.peers.isEmpty { Text(model.active ? "Keep Aura open on both phones in the same event." : "Start discovery to see opted-in profiles in this room.").font(.subheadline) }
+                Button(model.active ? "Pause discovery" : "Start discovery") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
+                Text("Camera stays on your phone. Nothing is recorded.").font(.caption2).foregroundStyle(.secondary)
+            }.padding(20).background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:26)).padding(.horizontal,14).padding(.bottom,12)
+        }.foregroundStyle(.white)
+    }.task {
+        switch AVCaptureDevice.authorizationStatus(for:.video) {
+        case .authorized: cameraAllowed=true
+        case .notDetermined: cameraAllowed=await AVCaptureDevice.requestAccess(for:.video)
+        default: cameraAllowed=false
+        }
+        permissionChecked=true
+    }.sheet(item:$cameraPeer) { peer in PeerDetailView(model:model,peer:peer) }
+    .onDisappear { Task { await model.endPositioning() } }
+    }
 }
 struct PeerDetailView:View {
     @ObservedObject var model:DiscoveryViewModel

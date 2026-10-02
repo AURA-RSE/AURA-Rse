@@ -69,6 +69,21 @@ public final class AndroidPilotTest {
                 a.onToken("fixture-builder",peerToken,-50);a.onToken("fixture-hiring",otherToken,-55);
             });
             awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
+            // Camera preview uses emulator optics; identity cards still require authorized API resolution.
+            InstrumentationRegistry.getInstrumentation().getUiAutomation().grantRuntimePermission(context().getPackageName(),android.Manifest.permission.CAMERA);
+            scenario.onActivity(a->text(a.findViewById(android.R.id.content),"Open room camera ↗").performClick());
+            awaitText(scenario,"Camera live · nothing is recorded");awaitText(scenario,"2 nearby · tap a profile");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(root.findViewWithTag("room-camera-preview"));root.findViewWithTag("camera-profile-"+peerWallet).performClick();});
+            awaitDialogText(scenario,"Save connection");InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(500);
+            scenario.onActivity(a->{try{var f=MainActivity.class.getDeclaredField("notice");f.setAccessible(true);((TextView)f.get(a)).setText("CAMERA TEST FIXTURES · Emulated scene and synthetic profiles");}catch(Exception e){throw new AssertionError(e);}});
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            Thread.sleep(350);
+            android.graphics.Bitmap cameraShot=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(cameraShot);
+            try(var stream=new java.io.FileOutputStream(new java.io.File(context().getExternalFilesDir(null),"camera-test-fixtures.png"))){cameraShot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream);}cameraShot.recycle();
+            scenario.onActivity(a->text(a.findViewById(android.R.id.content),"Pause discovery").performClick());awaitText(scenario,"Discovery paused");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNull(root.findViewWithTag("camera-profile-"+peerWallet));text(root,"Nearby view and event").performClick();setPrivate(a,"active",true);callPrivate(a,"render");a.onToken("fixture-builder",peerToken,-50);a.onToken("fixture-hiring",otherToken,-55);});
+            awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(root.findViewWithTag("nearby-profile-"+peerWallet));((android.widget.Spinner)root.findViewWithTag("Connection intent")).setSelection(2);});
             awaitText(scenario,"LIVE IN YOUR EVENT · 1 nearby");
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Hiring fixture"));assertNull(text(root,"Builder fixture"));((android.widget.Spinner)root.findViewWithTag("Connection intent")).setSelection(0);});

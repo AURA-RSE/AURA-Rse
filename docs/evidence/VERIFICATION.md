@@ -1,5 +1,12 @@
 # Verification record
 
+## 2026-10-02 — live room camera
+
+- Added local-only room-camera preview on Android and iPhone, authorized nearby-profile trays, profile opening, discovery controls, and permission handling. No recording, microphone capture, face matching, or image upload was added.
+- Android build and lint pass with no errors. Lint includes dependency upgrade notices, the existing debug HTTP configuration, and untranslated UI strings. Four emulator instrumentation tests cover a streaming CameraX preview, profile opening from the camera tray, and clearing cards on pause, alongside the prior save/profile checks. `android-room-camera-fixtures.png` is an emulated camera scene with synthetic profile fixtures.
+- The signed iPhone camera build succeeded and was installed on the connected test phone. The measured-marker renderer updates per display frame, reuses its entity, hides invalid/out-of-view measurements, and supports taps. Camera and physical marker behavior still require user validation.
+- Nearby trays do not represent physical positions. Multi-person spatial overlays remain unimplemented. See `../ROOM-CAMERA.md` for the implementation boundary and device checks.
+
 ## 2026-10-02 — profile drafts and saved connections
 
 - Android list refreshes no longer rebuild the My Aura form and discard unsaved text or Presence selections. Discover now links directly to saved connections in People. Reopening a saved profile from Discover retains its private note and saved state.

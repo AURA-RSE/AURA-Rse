@@ -20,6 +20,10 @@ android {
 
 dependencies {
     // 2.2.0 requires compileSdk 37. Keep this SDK-35-compatible release until a tested toolchain upgrade.
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.camera:camera-camera2:1.4.2'
+    implementation 'androidx.camera:camera-lifecycle:1.4.2'
+    implementation 'androidx.camera:camera-view:1.4.2'
     implementation 'com.solanamobile:mobile-wallet-adapter-clientlib:2.0.8'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:core:1.6.1'

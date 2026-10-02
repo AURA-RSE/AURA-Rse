@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Native Android pilot with opt-in BLE and official Mobile Wallet Adapter signing. */
-public final class MainActivity extends Activity implements BleDiscovery.Listener {
+public final class MainActivity extends androidx.activity.ComponentActivity implements BleDiscovery.Listener {
     private static final int BG = Color.rgb(11,13,18), PANEL = Color.rgb(20,25,34), LIME = Color.rgb(209,255,114), MUTED = Color.rgb(158,169,182);
     private static final String[] INTENTS = {"Building","Hiring","Fundraising","Looking for a team","Offering feedback","Open to connect"};
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -46,7 +46,9 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
     private LinearLayout root, body, nearbyList;
     private TextView notice;
     private String nearbyRenderKey;
-    private boolean floatingProfiles = true;
+    private boolean floatingProfiles = true, cameraMode;
+    private LinearLayout cameraPeers;
+    private TextView cameraNearbyCount;
     private JSONObject profile;
     private JSONArray events = new JSONArray(), connections = new JSONArray(), payments = new JSONArray();
     private String origin, token, selectedEvent = "", tab = "Discover", search = "", intent = "All";
@@ -112,7 +114,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         if (destroyed) return;
         root = column();root.setBackgroundColor(BG);
         root.setOnApplyWindowInsetsListener((v,insets)->{var bars=insets.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(22)+bars.left,bars.top,dp(22)+bars.right,bars.bottom);return insets;});
-        TextView logo = text("aura◌",34,Color.WHITE);logo.setTypeface(null,Typeface.BOLD);root.addView(logo);
+        TextView logo = text("aura◌",34,Color.WHITE);logo.setTypeface(null,Typeface.BOLD);if(profile!=null&&cameraMode&&"Discover".equals(tab))logo.setVisibility(View.GONE);root.addView(logo);
         notice = text("DEVNET PILOT · Your wallet keys stay in your wallet.",12,MUTED);root.addView(notice);
         ScrollView scroll = new ScrollView(this);body = column();body.setPadding(0,dp(12),0,dp(28));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         if (profile != null) {
@@ -124,7 +126,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         }
         if(nativeWallet.busy()){Button cancel=new Button(this);cancel.setText(R.string.close_wallet_request);root.addView(cancel);cancel.setOnClickListener(v->{nativeWallet.cancel();render();message("Wallet request closed. Check Activity before starting another payment.");});}
         setContentView(root);root.requestApplyInsets();
-        if (profile == null) onboarding();else switch(tab) {case "People":people();break;case "Activity":activity();break;case "My Aura":profileEditor();break;default:discover();}
+        if (profile == null) onboarding();else switch(tab) {case "People":people();break;case "Activity":activity();break;case "My Aura":profileEditor();break;default:if(cameraMode)roomCamera();else discover();}
     }
     private void onboarding() {
         title(body,"Your people.\nAlready in the room.");body.addView(text("Connect your identity, choose to be seen, and find a reason to say hello.",16,MUTED));
@@ -161,6 +163,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         },null);
     }
     private void discover() {
+        button(body,"Open room camera ↗",this::openRoomCamera);
         body.addView(text("THE ROOM IS YOURS.",11,LIME));title(body,"Builders around you.");body.addView(text("Find a collaborator. Meet your next team.",15,MUTED));
         List<String> names=new ArrayList<>();List<String> ids=new ArrayList<>();int chosen=0;
         for(int i=0;i<events.length();i++){JSONObject e=events.optJSONObject(i);names.add(e.optString("name"));ids.add(e.optString("id"));if(e.optString("id").equals(selectedEvent))chosen=i;}
@@ -176,7 +179,36 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         mode.setOnCheckedChangeListener((group,id)->{RadioButton chosenMode=group.findViewById(id);floatingProfiles="Floating".contentEquals(chosenMode.getText());renderPeers();});body.addView(mode);
         nearbyList=column();nearbyRenderKey=null;body.addView(nearbyList);renderPeers();
     }
+    private void openRoomCamera(){
+        if(checkSelfPermission(android.Manifest.permission.CAMERA)!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.CAMERA},11);return;}
+        cameraMode=true;render();
+    }
+    private void roomCamera(){
+        body.setPadding(0,0,0,0);
+        FrameLayout scene=new FrameLayout(this);scene.setBackgroundColor(Color.BLACK);body.addView(scene,new LinearLayout.LayoutParams(-1,dp(450)));
+        View viewport=(View)body.getParent();viewport.addOnLayoutChangeListener((v,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{int height=bottom-top;if(height>0&&scene.getLayoutParams().height!=height){scene.getLayoutParams().height=height;scene.requestLayout();}});
+        TextView cameraState=text("Starting camera…",12,Color.WHITE);
+        if(checkSelfPermission(android.Manifest.permission.CAMERA)==android.content.pm.PackageManager.PERMISSION_GRANTED)scene.addView(new RoomCameraView(this,this,cameraState::setText),new FrameLayout.LayoutParams(-1,-1));
+        else cameraState.setText("Camera access is off. Return to nearby view to allow it.");
+        LinearLayout header=column();header.setPadding(dp(16),dp(12),dp(16),dp(12));header.setBackgroundColor(0x99000000);header.addView(text("AURA · ROOM CAMERA",14,LIME));header.addView(cameraState);Button back=button(header,"Nearby view and event",()->{cameraMode=false;render();});back.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(40)));scene.addView(header,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        LinearLayout dock=column();dock.setPadding(dp(12),dp(10),dp(12),dp(12));dock.setBackgroundColor(0xDD0B0D12);cameraNearbyCount=text("",14,LIME);dock.addView(cameraNearbyCount);dock.addView(text("Nearby profiles · direction unavailable on this device",12,MUTED));
+        HorizontalScrollView strip=new HorizontalScrollView(this);cameraPeers=new LinearLayout(this);strip.addView(cameraPeers);dock.addView(strip);scene.addView(dock,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        LinearLayout controls=new LinearLayout(this);dock.addView(controls);
+        Button discovery=button(controls,active?"Pause discovery":starting?"Cancel discovery start":"Start discovery ↗",()->{if(active||starting){stopDiscovery();render();}else startDiscovery();});discovery.setTextSize(12);discovery.setLayoutParams(new LinearLayout.LayoutParams(0,dp(48),1));
+        Button saved=button(controls,"Saved connections → People",()->{tab="People";render();refresh();});saved.setTextSize(12);saved.setLayoutParams(new LinearLayout.LayoutParams(0,dp(48),1));
+        nearbyRenderKey=null;renderCameraPeers();
+    }
+    private void renderCameraPeers(){
+        if(cameraPeers==null||!"Discover".equals(tab))return;
+        List<Peer> visible=new ArrayList<>();long now=System.currentTimeMillis();if(active)for(Peer p:peers.values())if(PresenceRules.fresh(p.seen,p.expires,now)&&!"stealth".equals(p.profile.optString("status")))visible.add(p);
+        visible.sort(Comparator.comparing(p->p.profile.optString("wallet")));
+        String key=active+":"+visible.stream().map(p->p.profile.toString()).reduce("",String::concat);if(key.equals(nearbyRenderKey))return;nearbyRenderKey=key;
+        cameraNearbyCount.setText(active?visible.size()+" nearby · tap a profile":"Discovery paused");cameraPeers.removeAllViews();
+        if(visible.isEmpty())cameraPeers.addView(text(active?"No nearby profiles yet":"Start discovery to meet people in this room",14,Color.WHITE));
+        for(Peer p:visible){JSONObject person=p.profile;Button card=new Button(this);card.setTag("camera-profile-"+person.optString("wallet"));card.setAllCaps(false);card.setText(person.optString("name")+"\n"+person.optString("role")+"\n"+person.optString("project"));card.setTextColor(LIME);card.setBackground(background(PANEL,18));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(205),dp(115));params.setMargins(dp(4),0,dp(8),0);cameraPeers.addView(card,params);card.setOnClickListener(v->detail(person,""));}
+    }
     private void renderPeers() {
+        if(cameraMode){renderCameraPeers();return;}
         if(nearbyList==null||!"Discover".equals(tab))return;
         List<Peer> matches=new ArrayList<>();long now=System.currentTimeMillis();
         if(active)for(Peer peer:peers.values()){
@@ -219,7 +251,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
             starting=false;presenceExpires=r.getLong("expires");active=true;radio.start(r.getString("token"),presenceExpires);render();if(active)main.postDelayed(heartbeat,1000);
         },r->{if(run!=discoveryEpoch)return;stopDiscovery();render();message(r.optString("error"));});
     }
-    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grants){super.onRequestPermissionsResult(requestCode,permissions,grants);if(requestCode==10){if(radio.permitted())startDiscovery();else message("Nearby Devices access was denied. You can still use your profile and saved connections.");}}
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grants){super.onRequestPermissionsResult(requestCode,permissions,grants);if(requestCode==10){if(radio.permitted())startDiscovery();else message("Nearby Devices access was denied. You can still use your profile and saved connections.");}else if(requestCode==11){if(checkSelfPermission(android.Manifest.permission.CAMERA)==android.content.pm.PackageManager.PERMISSION_GRANTED){cameraMode=true;render();}else message("Camera access was denied. Nearby profiles and saved connections remain available.");}}
     private void heartbeat() {
         if(!active||!foreground||destroyed)return;long now=System.currentTimeMillis();peers.values().removeIf(p->!PresenceRules.fresh(p.seen,p.expires,now));renderPeers();
         if(!radio.ready()||presenceExpires<=now){stopDiscovery();render();message("Discovery stopped: Bluetooth or presence is unavailable.");return;}

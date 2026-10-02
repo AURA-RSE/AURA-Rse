@@ -28,6 +28,7 @@ try{
  mkdirSync('docs/evidence',{recursive:true});writeFileSync('docs/evidence/android-device-tests.txt',output);console.log(output);
  if(!/OK \(4 tests\)/.test(output))throw Error('Android instrumentation did not pass all 4 tests');
  await command(['pull','/sdcard/Android/data/app.aura.pilot/files/nearby-test-fixtures.png','docs/evidence/android-nearby-test-fixtures.png']);
+ await command(['pull','/sdcard/Android/data/app.aura.pilot/files/camera-test-fixtures.png','docs/evidence/android-room-camera-fixtures.png']);
  await command(['shell','am','start','-n','app.aura.pilot/.MainActivity']);
  console.log('PASS: isolated emulator UI / Keystore / API / nearby-card tests. No real wallet or radio proof claimed.');
 }finally{await new Promise(resolve=>server.close(resolve));}

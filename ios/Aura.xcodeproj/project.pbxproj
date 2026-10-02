@@ -258,7 +258,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_FILE = Config/Debug.plist;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Discover nearby Aura participants when you start discovery.";
-                INFOPLIST_KEY_NSCameraUsageDescription = "Show measured participant device positions in the camera view.";
+                INFOPLIST_KEY_NSCameraUsageDescription = "Show the live room camera and measured nearby profile markers. Camera images stay on this device.";
                 INFOPLIST_KEY_NSNearbyInteractionUsageDescription = "Share distance and direction after accepting positioning.";
                 INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to your local Aura pilot server.";
                 INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -295,7 +295,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_FILE = Config/Release.plist;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Discover nearby Aura participants when you start discovery.";
-                INFOPLIST_KEY_NSCameraUsageDescription = "Show measured participant device positions in the camera view.";
+                INFOPLIST_KEY_NSCameraUsageDescription = "Show the live room camera and measured nearby profile markers. Camera images stay on this device.";
                 INFOPLIST_KEY_NSNearbyInteractionUsageDescription = "Share distance and direction after accepting positioning.";
                 INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to your local Aura pilot server.";
                 INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
