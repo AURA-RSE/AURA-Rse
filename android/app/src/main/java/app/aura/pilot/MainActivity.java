@@ -155,7 +155,9 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         if(token==null)return;
         request(c->AuraApi.object("events",c.get("/api/events").getJSONArray("events"),"connections",c.get("/api/connections").getJSONArray("connections"),"payments",c.get("/api/payments").getJSONArray("payments")),r->{
             events=r.getJSONArray("events");connections=r.getJSONArray("connections");payments=r.getJSONArray("payments");boolean found=false;for(int i=0;i<events.length();i++)if(events.getJSONObject(i).getString("id").equals(selectedEvent))found=true;
-            if(!found)selectedEvent=events.length()>0?events.getJSONObject(0).getString("id"):"";render();
+            if(!found)selectedEvent=events.length()>0?events.getJSONObject(0).getString("id"):"";
+            // An unrelated list refresh must never replace an in-progress profile draft.
+            if(!"My Aura".equals(tab))render();
         },null);
     }
     private void discover() {
@@ -166,6 +168,7 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         Spinner event=select(body,"Your event",names,chosen,i->selectedEvent=ids.get(i));event.setEnabled(!active && !starting);
         button(body,active?"Pause discovery":starting?"Cancel discovery start":"Start discovery ↗",()->{if(active||starting){stopDiscovery();render();}else startDiscovery();});
         body.addView(text(active?"Keep Aura open. Nearby participants appear when their devices are discovered.":"Your phone is not broadcasting. Select a visible status and start when you are ready.",13,MUTED));
+        button(body,"Saved connections → People",()->{tab="People";render();refresh();});
         EditText query=field(body,"Search name, role or project",search,100);query.setTag("nearby-search");query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){search=s.toString();renderPeers();}public void afterTextChanged(Editable e){}});
         List<String> filters=new ArrayList<>();filters.add("All");filters.addAll(Arrays.asList(INTENTS));select(body,"Connection intent",filters,filters.indexOf(intent),i->{intent=filters.get(i);renderPeers();});
         RadioGroup mode=new RadioGroup(this);mode.setOrientation(LinearLayout.HORIZONTAL);
@@ -266,9 +269,12 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
     private void detail(JSONObject peer,String savedNote){
         LinearLayout card=column();card.setPadding(dp(20),dp(12),dp(20),dp(16));title(card,peer.optString("name"));card.addView(text("heads-down".equals(peer.optString("status"))?"Heads down · avoid interruptions":"Open to connect",12,LIME));JSONArray peerIntents=peer.optJSONArray("intents");if(peerIntents!=null){List<String> labels=new ArrayList<>();for(int i=0;i<peerIntents.length();i++)labels.add(peerIntents.optString(i));card.addView(text(String.join(" · ",labels),12,MUTED));}card.addView(text(peer.optString("role")+" · "+peer.optString("project"),15,MUTED));card.addView(text(peer.optString("bio"),14,MUTED));TextView address=text(peer.optString("wallet"),12,LIME);address.setTextIsSelectable(true);card.addView(address);
         String link=peer.optString("link");if(link.startsWith("https://"))button(card,"Visit project / social ↗",()->open(link));String video=peer.optString("video");if(video.startsWith("https://"))button(card,"Watch intro link ↗",()->open(video));
-        EditText note=field(card,"Private note",savedNote,1000);note.setTag("connection-note");
+        String initialNote=savedNote;boolean alreadySaved=false;
+        for(int i=0;i<connections.length();i++){JSONObject c=connections.optJSONObject(i);if(peer.optString("wallet").equals(c.optString("target"))){initialNote=c.optString("note");alreadySaved=true;break;}}
+        EditText note=field(card,"Private note",initialNote,1000);note.setTag("connection-note");
         TextView saveStatus=text("",13,MUTED);saveStatus.setTag("connection-save-status");saveStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);card.addView(saveStatus);
-        Button saveConnection=button(card,"Save connection",()->{});
+        Button saveConnection=button(card,alreadySaved?"Saved ✓":"Save connection",()->{});
+        if(alreadySaved)saveStatus.setText("Connection and private note saved. Find them in People.");
         saveConnection.setOnClickListener(v->{
             String value=note.getText().toString();saveConnection.setEnabled(false);note.setEnabled(false);saveStatus.setText("Saving connection…");
             request(c->c.call("PUT","/api/connections",AuraApi.object("wallet",peer.optString("wallet"),"note",value)),r->{

@@ -1,5 +1,12 @@
 # Verification record
 
+## 2026-10-02 — profile drafts and saved connections
+
+- Android list refreshes no longer rebuild the My Aura form and discard unsaved text or Presence selections. Discover now links directly to saved connections in People. Reopening a saved profile from Discover retains its private note and saved state.
+- All 30 backend tests passed, including saved-note access after discovery access expires and the participant switches to Stealth.
+- All four Android instrumentation tests passed. The regression checks refresh the profile form while editing Presence, save and verify Stealth through the API, and confirm a saved note remains visible after discovery stops and the activity is recreated. Reopening the discovered profile preserves the saved note.
+- Android build and lint passed. The physical-device Stealth observation remains unresolved pending a retest; these automated checks do not establish that physical outcome.
+
 ## 2026-10-02 — Android saved-connection feedback
 
 - Saving a connection now shows progress, success and errors inside the open profile panel. A failed save retains the note; an in-flight save disables duplicate submissions.

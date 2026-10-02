@@ -37,16 +37,18 @@ public final class AndroidPilotTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             awaitText(scenario,"Builders around you.");
             scenario.onActivity(a->text(a.findViewById(android.R.id.content),"My Aura").performClick());awaitText(scenario,old);
-            // Wait for the tab's asynchronous refresh to finish before editing.
-            Thread.sleep(500);
-            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);View name=text(root,old);assertTrue(name instanceof EditText);((EditText)name).setText("Android UI verified");text(root,"Save profile").performClick();});
+            var refreshed=new java.util.concurrent.CountDownLatch(1);
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);View name=text(root,old);assertTrue(name instanceof EditText);((EditText)name).setText("Android UI verified");((android.widget.Spinner)root.findViewWithTag("Presence")).setSelection(0);callPrivate(a,"refresh");try{var f=MainActivity.class.getDeclaredField("io");f.setAccessible(true);((java.util.concurrent.ExecutorService)f.get(a)).execute(()->new android.os.Handler(android.os.Looper.getMainLooper()).post(refreshed::countDown));}catch(Exception e){throw new AssertionError(e);}});
+            assertTrue("List refresh completed",refreshed.await(15,java.util.concurrent.TimeUnit.SECONDS));
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Android UI verified"));assertEquals("stealth",((android.widget.Spinner)root.findViewWithTag("Presence")).getSelectedItem());text(root,"Save profile").performClick();});
             awaitText(scenario,"Profile saved.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
+            assertEquals("stealth",api.get("/api/me").getJSONObject("profile").getString("status"));
             // Event errors stay beside the code without wiping the profile form.
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);text(root,"Join event").performClick();assertNotNull(text(root,"Enter an event code first."));((EditText)root.findViewWithTag("event-code")).setText("AURA-LAB");((EditText)text(root,"Android UI verified")).setText("Unsaved edit");text(root,"Join event").performClick();assertNotNull(text(root,"Save your profile changes before joining."));assertNotNull(text(root,"Unsaved edit"));((EditText)text(root,"Unsaved edit")).setText("Android UI verified");((EditText)root.findViewWithTag("event-code")).setText("MISSING-EVENT");text(root,"Join event").performClick();});
             awaitText(scenario,"Could not join: Event code not found");
             api.post("/api/events/leave",AuraApi.object("event","aura-lab"));
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);((EditText)root.findViewWithTag("event-code")).setText("AURA-LAB");text(root,"Join event").performClick();});
-            awaitText(scenario,"Joined Aura Local Lab. You can start discovery when ready.");
+            awaitText(scenario,"Joined Aura Local Lab. Choose Open in My Aura and save before starting discovery.");
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Builders around you."));assertEquals("Aura Local Lab",((android.widget.Spinner)root.findViewWithTag("Your event")).getSelectedItem().toString());});
             assertEquals(1,api.get("/api/events").getJSONArray("events").length());
             scenario.recreate();awaitText(scenario,"Builders around you.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
@@ -80,6 +82,16 @@ public final class AndroidPilotTest {
             scenario.onActivity(a->{boolean found=false;for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews())if(text(window,"Save connection")!=null){found=true;((EditText)window.findViewWithTag("connection-note")).setText("Met at the test event");text(window,"Save connection").performClick();}assertTrue("Card opens the existing profile detail",found);});
             awaitDialogText(scenario,"Connection and private note saved. Find them in People.");awaitDialogText(scenario,"Saved ✓");
             AuraApi api=new AuraApi(origin,token);var savedConnections=api.get("/api/connections").getJSONArray("connections");assertEquals(1,savedConnections.length());assertEquals("Met at the test event",savedConnections.getJSONObject(0).getString("note"));
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            scenario.onActivity(a->{callPrivate(a,"stopDiscovery");text(a.findViewById(android.R.id.content),"Saved connections → People").performClick();});
+            awaitText(scenario,"Met at the test event");
+            scenario.recreate();awaitText(scenario,"Builders around you.");
+            scenario.onActivity(a->text(a.findViewById(android.R.id.content),"Saved connections → People").performClick());
+            awaitText(scenario,"Met at the test event");
+            scenario.onActivity(a->{setPrivate(a,"tab","Discover");setPrivate(a,"active",true);callPrivate(a,"render");a.onToken("fixture-builder",peerToken,-50);a.onToken("fixture-hiring",otherToken,-55);});
+            awaitText(scenario,"LIVE IN YOUR EVENT · 2 nearby");
+            scenario.onActivity(a->a.findViewById(android.R.id.content).findViewWithTag("nearby-profile-"+peerWallet).performClick());
+            awaitDialogText(scenario,"Met at the test event");awaitDialogText(scenario,"Saved ✓");
             // A rejected update must show its error in the open panel and retain the draft.
             api.post("/api/blocks",AuraApi.object("wallet",peerWallet));
             scenario.onActivity(a->{for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews())if(window.findViewWithTag("connection-note")!=null){((EditText)window.findViewWithTag("connection-note")).setText("Keep this unsaved note");text(window,"Save connection").performClick();}});
