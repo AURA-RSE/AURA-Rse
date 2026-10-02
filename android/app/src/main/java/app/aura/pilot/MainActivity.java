@@ -245,7 +245,22 @@ public final class MainActivity extends Activity implements BleDiscovery.Listene
         List<CheckBox> checks=new ArrayList<>();JSONArray existing=profile.optJSONArray("intents");for(String label:INTENTS){CheckBox check=new CheckBox(this);check.setText(label);check.setTextColor(Color.WHITE);if(existing!=null)for(int i=0;i<existing.length();i++)if(label.equals(existing.optString(i)))check.setChecked(true);body.addView(check);checks.add(check);}
         button(body,"Save profile",()->{JSONObject payload=new JSONObject();try{for(var entry:fields.entrySet())payload.put(entry.getKey(),entry.getValue().getText().toString());JSONArray picked=new JSONArray();for(CheckBox c:checks)if(c.isChecked())picked.put(c.getText());payload.put("intents",picked);payload.put("status",chosen[0]);if("stealth".equals(chosen[0]))stopDiscovery();request(c->c.call("PUT","/api/me",payload),r->{profile=r.getJSONObject("profile");render();message("Profile saved.");},null);}catch(Exception e){problem(e);}});
         body.addView(text("Save text changes before uploading media. Avatars: PNG/JPEG up to 2 MB. Intro video: MP4, up to 30 seconds and 20 MB.",12,MUTED));button(body,"Upload avatar",()->chooseMedia(20,"image/*"));button(body,"Upload intro video",()->chooseMedia(21,"video/mp4"));
-        EditText code=field(body,"Event code","",40);button(body,"Join event",()->{String value=code.getText().toString();request(c->c.post("/api/events/join",AuraApi.object("code",value)),r->refresh(),null);});
+        EditText code=field(body,"Event code","",40);code.setTag("event-code");
+        TextView joinStatus=text("",13,MUTED);joinStatus.setTag("event-join-status");joinStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(joinStatus);
+        Button join=button(body,"Join event",()->{});
+        join.setOnClickListener(v->{
+            String value=code.getText().toString().trim();
+            if(value.isEmpty()){joinStatus.setText("Enter an event code first.");return;}
+            boolean changed=!chosen[0].equals(profile.optString("status"));
+            for(var entry:fields.entrySet())if(!entry.getValue().getText().toString().equals(profile.optString(entry.getKey())))changed=true;
+            Set<String> originalIntents=new HashSet<>(),draftIntents=new HashSet<>();if(existing!=null)for(int i=0;i<existing.length();i++)originalIntents.add(existing.optString(i));for(CheckBox check:checks)if(check.isChecked())draftIntents.add(check.getText().toString());
+            if(changed||!originalIntents.equals(draftIntents)){joinStatus.setText("Save your profile changes before joining.");return;}
+            join.setEnabled(false);joinStatus.setText("Joining event…");
+            request(c->c.post("/api/events/join",AuraApi.object("code",value)),r->{
+                JSONObject joined=r.getJSONObject("event");String id=joined.getString("id");boolean known=false;for(int i=0;i<events.length();i++)if(id.equals(events.optJSONObject(i).optString("id")))known=true;if(!known)events.put(joined);
+                if(!id.equals(selectedEvent))stopDiscovery();selectedEvent=id;tab="Discover";render();message("Joined "+joined.getString("name")+"."+("stealth".equals(profile.optString("status"))?" Choose Open in My Aura and save before starting discovery.":" You can start discovery when ready."));
+            },r->{join.setEnabled(true);joinStatus.setText("Could not join: "+r.optString("error"));});
+        });
         body.addView(text("Stealth stops discovery. Saved connections retain profile access unless blocked. Notes are private to your account.",12,MUTED));button(body,"Export, delete and manage blocks ↗",()->open(origin));button(body,"Sign out",()->{AuraApi current=api;stopDiscovery();if(!io.isShutdown())io.execute(()->{try{current.post("/api/auth/logout",AuraApi.object());}catch(Exception ignored){}});clearSession();});
     }
     private void detail(JSONObject peer,String savedNote){

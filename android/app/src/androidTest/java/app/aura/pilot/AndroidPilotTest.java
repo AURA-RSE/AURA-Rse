@@ -40,6 +40,14 @@ public final class AndroidPilotTest {
             Thread.sleep(500);
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);View name=text(root,old);assertTrue(name instanceof EditText);((EditText)name).setText("Android UI verified");text(root,"Save profile").performClick();});
             awaitText(scenario,"Profile saved.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
+            // Event errors stay beside the code without wiping the profile form.
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);text(root,"Join event").performClick();assertNotNull(text(root,"Enter an event code first."));((EditText)root.findViewWithTag("event-code")).setText("AURA-LAB");((EditText)text(root,"Android UI verified")).setText("Unsaved edit");text(root,"Join event").performClick();assertNotNull(text(root,"Save your profile changes before joining."));assertNotNull(text(root,"Unsaved edit"));((EditText)text(root,"Unsaved edit")).setText("Android UI verified");((EditText)root.findViewWithTag("event-code")).setText("MISSING-EVENT");text(root,"Join event").performClick();});
+            awaitText(scenario,"Could not join: Event code not found");
+            api.post("/api/events/leave",AuraApi.object("event","aura-lab"));
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);((EditText)root.findViewWithTag("event-code")).setText("AURA-LAB");text(root,"Join event").performClick();});
+            awaitText(scenario,"Joined Aura Local Lab. You can start discovery when ready.");
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Builders around you."));assertEquals("Aura Local Lab",((android.widget.Spinner)root.findViewWithTag("Your event")).getSelectedItem().toString());});
+            assertEquals(1,api.get("/api/events").getJSONArray("events").length());
             scenario.recreate();awaitText(scenario,"Builders around you.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
         }finally{store.clear(origin);context().getSharedPreferences("aura-settings",0).edit().clear().commit();}
     }

@@ -1,5 +1,12 @@
 # Verification record
 
+## 2026-10-02 — physical Android sign-in and event-join feedback
+
+- **Physical Samsung SM-A055F, Android 15:** the user approved Aura's native Solflare sign-in and reached the profile screen. The isolated backend verified a created profile and active authenticated session. App/wallet versions and the tested APK checksum are recorded in `physical-wallet-signin.json`. This is manual device evidence, not an independently witnessed audit or a payment receipt.
+- Subsequent backend inspection confirmed a saved profile and event membership. Repeated USB connection interruptions affected local server access; a shared Wi-Fi connection is being prepared. No physical peer discovery, spatial measurement or confirmed payment is established by this run.
+- Fixed Android event joining: successful joining selects the event and opens Discover with confirmation; errors remain beside the event code; unsaved profile changes require saving before navigation; changing events clears previous discovery.
+- **Four Android emulator instrumentation tests passed**, including blank/invalid event code handling, unsaved-edit preservation, joining through the real isolated API, selected-event feedback, and profile persistence. Native app build passed; lint retains five existing warnings and no errors. Emulator evidence remains separate from the physical sign-in result.
+
 ## 2026-10-01 — floating nearby profiles
 
 - Added native iPhone and Android floating cards for profiles resolved through the existing opt-in, same-event BLE flow. Cards include protected avatars or initials, project/role, interest and availability; search, intent filters and list mode share the same authorized peers. Layout does not represent physical coordinates.
