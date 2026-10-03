@@ -21,7 +21,8 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
   });
   const profile = w => { const row = get('SELECT * FROM profiles WHERE wallet=?',w); return row && {...JSON.parse(row.data),wallet:w,updated:row.updated}; };
   const blocked = (a,b) => get('SELECT 1 FROM blocks WHERE (owner=? AND target=?) OR (owner=? AND target=?)',a,b,b,a);
-  const canRead = (a,b) => a===b || (!blocked(a,b) && (get('SELECT 1 FROM access WHERE viewer=? AND target=? AND expires>?',a,b,now()) || get('SELECT 1 FROM connections WHERE owner=? AND target=?',a,b)));
+  const directoryVisible = (a,b) => { const p=profile(b);return p?.eventDirectory === true && p.status !== 'stealth' && get('SELECT 1 FROM members a JOIN members b ON a.event=b.event WHERE a.wallet=? AND b.wallet=? LIMIT 1',a,b); };
+  const canRead = (a,b) => a===b || (!blocked(a,b) && (directoryVisible(a,b) || get('SELECT 1 FROM access WHERE viewer=? AND target=? AND expires>?',a,b,now()) || get('SELECT 1 FROM connections WHERE owner=? AND target=?',a,b)));
   const session = w => {const token=secret(); run('INSERT INTO sessions VALUES(?,?,?)',hash(token),w,now()+7*86400000); return token;};
   const revokePresence = w => {run('DELETE FROM presence WHERE wallet=?',w);run('DELETE FROM access WHERE target=?',w);run('DELETE FROM ranging WHERE sender=? OR recipient=?',w,w);};
   const sweep = () => {for(const table of ['challenges','sessions','presence','access','devices','ranging','reports']) run(`DELETE FROM ${table} WHERE expires<=?`,now()); run('DELETE FROM payments WHERE signature IS NULL AND submitted_signature IS NULL AND expires<?',now()-86400000);};
@@ -85,7 +86,7 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
       if(route==='POST /api/auth/logout'){run('DELETE FROM sessions WHERE hash=?',hash(auth));revokePresence(me);return respond(200,{ok:true});}
       if(route==='GET /api/me')return respond(200,{profile:profile(me)});
       if(route==='PUT /api/me') {
-        const input=profileInput(body);const old=profile(me);const p={...input,avatarMediaId:old.avatarMediaId||null,videoMediaId:old.videoMediaId||null};run('UPDATE profiles SET data=?,updated=? WHERE wallet=?',JSON.stringify(p),now(),me);
+        const input=profileInput(body);const old=profile(me);const p={...input,eventDirectory:body.eventDirectory === undefined ? old.eventDirectory === true : input.eventDirectory,avatarMediaId:old.avatarMediaId||null,videoMediaId:old.videoMediaId||null};run('UPDATE profiles SET data=?,updated=? WHERE wallet=?',JSON.stringify(p),now(),me);
         if(p.status==='stealth')revokePresence(me);return respond(200,{profile:profile(me)});
       }
       if(route==='POST /api/device/approve') {
@@ -94,6 +95,15 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
         if(!result.changes)fail(404,'Pairing code expired or already used');return respond(200,{ok:true});
       }
       if(route==='GET /api/events')return respond(200,{events:all('SELECT e.id,e.name,e.owner FROM events e JOIN members m ON e.id=m.event WHERE m.wallet=?',me)});
+      if(route==='POST /api/events/people') {
+        const event=text(body.event,100,true);
+        if(!get('SELECT 1 FROM members WHERE event=? AND wallet=?',event,me))fail(403,'Join this event first');
+        const profiles=all('SELECT p.wallet,p.data,p.updated FROM profiles p JOIN members m ON p.wallet=m.wallet WHERE m.event=? AND p.wallet!=?',event,me)
+          .filter(row=>!blocked(me,row.wallet)).map(row=>({...JSON.parse(row.data),wallet:row.wallet,updated:row.updated}))
+          .filter(p=>p.eventDirectory===true && p.status!=='stealth')
+          .sort((a,b)=>a.name.localeCompare(b.name)||a.wallet.localeCompare(b.wallet));
+        return respond(200,{event,profiles});
+      }
       if(route==='POST /api/events') {
         const id=secret(12),code=randomBytes(5).toString('hex').toUpperCase();
         run('INSERT INTO events VALUES(?,?,?,?,?)',id,me,text(body.name,100,true),code,now());run('INSERT INTO members VALUES(?,?)',id,me);return respond(201,{id,code});

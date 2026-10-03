@@ -44,6 +44,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
     private AuraApi api;
     private BleDiscovery radio;
     private LinearLayout root, body, nearbyList;
+    private AlertDialog eventDirectoryDialog;
     private TextView notice;
     private String nearbyRenderKey;
     private boolean floatingProfiles = true, cameraMode;
@@ -71,7 +72,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         if (token != null) request(c -> c.get("/api/me"), r -> { profile = r.getJSONObject("profile"); refresh(); }, null);
     }
     @Override protected void onStart() { super.onStart();foreground = true;if(profile!=null)render();if (pairingSecret != null) main.post(pairingPoll); }
-    @Override protected void onStop() { foreground = false;main.removeCallbacks(pairingPoll);stopDiscovery();super.onStop(); }
+    @Override protected void onStop() { foreground = false;if(eventDirectoryDialog!=null)eventDirectoryDialog.dismiss();main.removeCallbacks(pairingPoll);stopDiscovery();super.onStop(); }
     @Override protected void onDestroy() { destroyed = true;main.removeCallbacksAndMessages(null);radio.stop();nativeWallet.close();presenceIo.shutdown();io.shutdown();super.onDestroy(); }
     private void request(Work work, Done done, Done failed) { requestOn(io, work, done, failed); }
     private void requestPresence(Work work, Done done, Done failed) { requestOn(presenceIo, work, done, failed); }
@@ -171,6 +172,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         Spinner event=select(body,"Your event",names,chosen,i->selectedEvent=ids.get(i));event.setEnabled(!active && !starting);
         button(body,active?"Pause discovery":starting?"Cancel discovery start":"Start discovery ↗",()->{if(active||starting){stopDiscovery();render();}else startDiscovery();});
         body.addView(text(active?"Keep Aura open. Nearby participants appear when their devices are discovered.":"Your phone is not broadcasting. Select a visible status and start when you are ready.",13,MUTED));
+        button(body,"People at this event",this::eventPeople);
         button(body,"Saved connections → People",()->{tab="People";render();refresh();});
         EditText query=field(body,"Search name, role or project",search,100);query.setTag("nearby-search");query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){search=s.toString();renderPeers();}public void afterTextChanged(Editable e){}});
         List<String> filters=new ArrayList<>();filters.add("All");filters.addAll(Arrays.asList(INTENTS));select(body,"Connection intent",filters,filters.indexOf(intent),i->{intent=filters.get(i);renderPeers();});
@@ -190,7 +192,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         TextView cameraState=text("Starting camera…",12,Color.WHITE);
         if(checkSelfPermission(android.Manifest.permission.CAMERA)==android.content.pm.PackageManager.PERMISSION_GRANTED)scene.addView(new RoomCameraView(this,this,cameraState::setText),new FrameLayout.LayoutParams(-1,-1));
         else cameraState.setText("Camera access is off. Return to nearby view to allow it.");
-        LinearLayout header=column();header.setPadding(dp(16),dp(12),dp(16),dp(12));header.setBackgroundColor(0x99000000);header.addView(text("AURA · ROOM CAMERA",14,LIME));header.addView(cameraState);Button back=button(header,"Nearby view and event",()->{cameraMode=false;render();});back.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(40)));scene.addView(header,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        LinearLayout header=column();header.setPadding(dp(16),dp(12),dp(16),dp(12));header.setBackgroundColor(0x99000000);header.addView(text("AURA · ROOM CAMERA",14,LIME));header.addView(cameraState);header.addView(text("Camera placement unavailable in this build. The cards below are a nearby list, not people located in the image.",13,Color.WHITE));Button back=button(header,"Nearby view and event",()->{cameraMode=false;render();});back.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(40)));scene.addView(header,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         LinearLayout dock=column();dock.setPadding(dp(12),dp(10),dp(12),dp(12));dock.setBackgroundColor(0xDD0B0D12);cameraNearbyCount=text("",14,LIME);dock.addView(cameraNearbyCount);dock.addView(text("Nearby profiles · direction unavailable on this device",12,MUTED));
         HorizontalScrollView strip=new HorizontalScrollView(this);cameraPeers=new LinearLayout(this);strip.addView(cameraPeers);dock.addView(strip);scene.addView(dock,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         LinearLayout controls=new LinearLayout(this);dock.addView(controls);
@@ -271,14 +273,40 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
     }
     @Override public void onError(String message){stopDiscovery();render();message(message);}
     @Override public void onState(String message){message(message);}
+    private void eventPeople(){
+        if(selectedEvent.isEmpty()){message("Join an event in My Aura first.");return;}
+        final String event=selectedEvent;
+        LinearLayout content=column();content.setPadding(dp(18),dp(8),dp(18),dp(16));
+        content.addView(text("Members who enable event search. No camera or Bluetooth needed; this is not a live proximity list.",13,MUTED));
+        content.addView(text("To appear here, enable Show me in event search in My Aura, choose a visible status, and save.",12,MUTED));
+        EditText query=field(content,"Search name, role or project","",100);query.setTag("event-directory-search");
+        final String[] filter={"All"};final JSONArray[] profiles={new JSONArray()};
+        LinearLayout results=column();TextView status=text("Loading participants…",13,MUTED);
+        Runnable draw=()->{results.removeAllViews();int count=0;for(int i=0;i<profiles[0].length();i++){
+            JSONObject person=profiles[0].optJSONObject(i);String words=person.optString("name")+" "+person.optString("role")+" "+person.optString("project");
+            if(!words.toLowerCase(Locale.ROOT).contains(query.getText().toString().toLowerCase(Locale.ROOT)))continue;
+            boolean match="All".equals(filter[0]);JSONArray intents=person.optJSONArray("intents");if(intents!=null)for(int j=0;j<intents.length();j++)if(filter[0].equals(intents.optString(j)))match=true;if(!match)continue;
+            count++;button(results,person.optString("name")+" · "+person.optString("project"),()->request(c->c.post("/api/profiles/read",AuraApi.object("wallet",person.optString("wallet"))),reply->detail(reply.getJSONObject("profile"),""),failure->status.setText(failure.optString("error"))));
+        }status.setText(count+" participants"+(count==0?" · No matching visible profiles yet.":""));};
+        List<String> choices=new ArrayList<>();choices.add("All");choices.addAll(Arrays.asList(INTENTS));select(content,"Connection intent",choices,0,i->{filter[0]=choices.get(i);draw.run();});
+        content.addView(status);content.addView(results);
+        query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){draw.run();}public void afterTextChanged(Editable e){}});
+        ScrollView scroll=new ScrollView(this);scroll.addView(content);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("People at this event").setView(scroll).setNegativeButton("Close",null).create();
+        final boolean[] inFlight={false};final Runnable[] poll=new Runnable[1];
+        poll[0]=()->{if(!dialog.isShowing()||destroyed||!foreground)return;if(!inFlight[0]){inFlight[0]=true;request(c->c.post("/api/events/people",AuraApi.object("event",event)),reply->{inFlight[0]=false;if(!dialog.isShowing())return;profiles[0]=reply.getJSONArray("profiles");draw.run();},failure->{inFlight[0]=false;if(!dialog.isShowing())return;profiles[0]=new JSONArray();results.removeAllViews();status.setText(failure.optString("error"));});}main.postDelayed(poll[0],5000);};
+        dialog.setOnDismissListener(ignored->main.removeCallbacks(poll[0]));eventDirectoryDialog=dialog;dialog.show();poll[0].run();
+    }
     private void people(){title(body,"Connections");button(body,"Refresh",this::refresh);if(connections.length()==0)body.addView(text("Discover someone and save their profile. Your notes remain private.",15,MUTED));for(int i=0;i<connections.length();i++){JSONObject c=connections.optJSONObject(i),p=c.optJSONObject("profile");if(p!=null){button(body,p.optString("name")+" · "+p.optString("project"),()->detail(p,c.optString("note")));if(!c.optString("note").isEmpty())body.addView(text(c.optString("note"),13,MUTED));}}}
     private void activity(){title(body,"Activity");body.addView(text("DEVNET ONLY · Confirmation is checked by the server against the transaction. Submitted does not mean confirmed.",13,MUTED));button(body,"Refresh receipts",this::refresh);pendingRecovery();if(payments.length()==0)body.addView(text("No payments yet.",15,MUTED));for(int i=0;i<payments.length();i++){JSONObject p=payments.optJSONObject(i);body.addView(text(java.math.BigDecimal.valueOf(p.optLong("lamports"),9).stripTrailingZeros().toPlainString()+" SOL",22,Color.WHITE));TextView wallet=text("To "+p.optString("recipient"),12,MUTED);wallet.setTextIsSelectable(true);body.addView(wallet);String signature=p.isNull("signature")?"":p.optString("signature");if(!signature.isEmpty())button(body,"Confirmed · open explorer ↗",()->open("https://explorer.solana.com/tx/"+signature+"?cluster=devnet"));else{body.addView(text(p.isNull("submitted_signature")?"Awaiting wallet approval":"Submitted · awaiting confirmation",13,LIME));if(!p.isNull("submitted_signature"))button(body,"Check confirmation",()->request(c->c.post("/api/payments/confirm",AuraApi.object("id",p.optString("id"))),r->{refresh();message("confirmed".equals(r.optString("state"))?"Confirmed on devnet.":"Still pending. No new payment sent.");},null));else if(p.optLong("expires")>System.currentTimeMillis())button(body,"Review in Android wallet ↗",()->reviewNativePayment(p));button(body,"Review / check in wallet companion ↗",()->open(origin+"?payment="+p.optString("id")));}}}
     private void profileEditor(){
         title(body,"My Aura");TextView address=text(profile.optString("wallet"),12,LIME);address.setTextIsSelectable(true);body.addView(address);
         Map<String,EditText> fields=new LinkedHashMap<>();for(String key:new String[]{"name","role","project","bio","link","video"})fields.put(key,field(body,key.substring(0,1).toUpperCase(Locale.ROOT)+key.substring(1),profile.optString(key),key.equals("name")?60:key.equals("role")?80:key.equals("project")?100:500));
         List<String> statuses=List.of("stealth","open","heads-down");final String[] chosen={profile.optString("status","stealth")};select(body,"Presence",statuses,statuses.indexOf(chosen[0]),i->chosen[0]=statuses.get(i));
+        CheckBox directory=new CheckBox(this);directory.setText("Show me in event search");directory.setTextColor(Color.WHITE);directory.setChecked(profile.optBoolean("eventDirectory"));body.addView(directory);
+        body.addView(text("Members of events you join can find your profile without Bluetooth. Stealth hides you. Saved connections can revisit your profile.",12,MUTED));
         List<CheckBox> checks=new ArrayList<>();JSONArray existing=profile.optJSONArray("intents");for(String label:INTENTS){CheckBox check=new CheckBox(this);check.setText(label);check.setTextColor(Color.WHITE);if(existing!=null)for(int i=0;i<existing.length();i++)if(label.equals(existing.optString(i)))check.setChecked(true);body.addView(check);checks.add(check);}
-        button(body,"Save profile",()->{JSONObject payload=new JSONObject();try{for(var entry:fields.entrySet())payload.put(entry.getKey(),entry.getValue().getText().toString());JSONArray picked=new JSONArray();for(CheckBox c:checks)if(c.isChecked())picked.put(c.getText());payload.put("intents",picked);payload.put("status",chosen[0]);if("stealth".equals(chosen[0]))stopDiscovery();request(c->c.call("PUT","/api/me",payload),r->{profile=r.getJSONObject("profile");render();message("Profile saved.");},null);}catch(Exception e){problem(e);}});
+        button(body,"Save profile",()->{JSONObject payload=new JSONObject();try{for(var entry:fields.entrySet())payload.put(entry.getKey(),entry.getValue().getText().toString());JSONArray picked=new JSONArray();for(CheckBox c:checks)if(c.isChecked())picked.put(c.getText());payload.put("intents",picked);payload.put("status",chosen[0]);payload.put("eventDirectory",directory.isChecked());if("stealth".equals(chosen[0]))stopDiscovery();request(c->c.call("PUT","/api/me",payload),r->{profile=r.getJSONObject("profile");render();message("Profile saved.");},null);}catch(Exception e){problem(e);}});
         body.addView(text("Save text changes before uploading media. Avatars: PNG/JPEG up to 2 MB. Intro video: MP4, up to 30 seconds and 20 MB.",12,MUTED));button(body,"Upload avatar",()->chooseMedia(20,"image/*"));button(body,"Upload intro video",()->chooseMedia(21,"video/mp4"));
         EditText code=field(body,"Event code","",40);code.setTag("event-code");
         TextView joinStatus=text("",13,MUTED);joinStatus.setTag("event-join-status");joinStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(joinStatus);
@@ -286,7 +314,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         join.setOnClickListener(v->{
             String value=code.getText().toString().trim();
             if(value.isEmpty()){joinStatus.setText("Enter an event code first.");return;}
-            boolean changed=!chosen[0].equals(profile.optString("status"));
+            boolean changed=!chosen[0].equals(profile.optString("status")) || directory.isChecked()!=profile.optBoolean("eventDirectory");
             for(var entry:fields.entrySet())if(!entry.getValue().getText().toString().equals(profile.optString(entry.getKey())))changed=true;
             Set<String> originalIntents=new HashSet<>(),draftIntents=new HashSet<>();if(existing!=null)for(int i=0;i<existing.length();i++)originalIntents.add(existing.optString(i));for(CheckBox check:checks)if(check.isChecked())draftIntents.add(check.getText().toString());
             if(changed||!originalIntents.equals(draftIntents)){joinStatus.setText("Save your profile changes before joining.");return;}

@@ -24,3 +24,11 @@ Android camera preview does not implement UWB/ARCore positioning. This iPhone/An
 4. Pause discovery or enter Stealth and verify cards clear. A physical Stealth regression remains pending after the Android profile-draft fix.
 5. With a second compatible iPhone, request and accept positioning, then verify measured-marker alignment, movement, out-of-view hiding, occlusion, expiry, and tap behavior against the physical scene. Record failures and missing measurements.
 6. Do not label tray browsing as positional AR or the emulator camera as a physical device result.
+
+## Camera limitation reported during manual use — 2026-10-03
+
+The user reported that camera search behaved like the existing search over a camera feed. This is a valid limitation report, not a successful spatial test. The Android tray is still a nearby list, and the iPhone camera cannot place profiles without a fresh accepted Nearby Interaction measurement. Both interfaces now make the absence of positional capability explicit. Do not describe these changes as a fix for multi-person camera discovery.
+
+The separate **People at this event** directory preserves browsing without opening the camera or starting BLE discovery. It lists explicitly opted-in visible members, supports name/role/project and intent filtering, and does not imply physical proximity. The existing nearby Floating/List search remains available.
+
+The next physical positioning test requires two compatible Apple devices. The existing `NINearbyPeerConfiguration` path is Apple-to-Apple; it does not position an Android peer. See [Apple's peer configuration](https://developer.apple.com/documentation/nearbyinteraction/ninearbypeerconfiguration). Cross-platform room coverage needs an additional measured positioning design and validation. A camera preview, BLE signal strength, arbitrary card coordinates, and face matching are not substitutes for that work.

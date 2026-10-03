@@ -6,6 +6,7 @@ struct DiscoveryView: View {
     @State private var query = ""
     @State private var intent = "All"
     @State private var showCamera = false
+    @State private var showEventPeople = false
     @State private var presentation = "Floating"
     var filtered:[NearbyPeer] { model.peers.filter { p in (intent == "All" || p.profile.intents.contains(intent)) && (query.isEmpty || "\(p.profile.name) \(p.profile.role) \(p.profile.project)".localizedCaseInsensitiveContains(query)) }.sorted { a,b in
         let order = a.profile.name.localizedCaseInsensitiveCompare(b.profile.name)
@@ -13,11 +14,13 @@ struct DiscoveryView: View {
     } }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:22) {
+            AuraBrand()
             HStack { Text("THE ROOM IS YOURS.").font(.caption2).tracking(2).foregroundStyle(AuraTheme.lime);Spacer();Text("DEVNET").font(.caption2.monospaced()).foregroundStyle(.secondary) }
             Text("Builders around you.").font(.system(size:36,weight:.semibold)).tracking(-1)
             Text("Find a collaborator. Meet your next team.").font(.subheadline).foregroundStyle(.secondary)
             Picker("Event",selection:$model.selectedEvent) { Text("Choose an event").tag("");ForEach(model.events) { Text($0.name).tag($0.id) } }.disabled(model.active)
             Button { showCamera = true } label: { Label("Open room camera",systemImage:"camera.fill").frame(maxWidth:.infinity) }.buttonStyle(.borderedProminent).foregroundStyle(.black)
+            Button { showEventPeople = true } label: { Label("People at this event",systemImage:"person.2.fill").frame(maxWidth:.infinity) }.buttonStyle(.bordered).disabled(model.selectedEvent.isEmpty)
             HStack {
                 Button(model.active ? "Pause discovery" : "Start discovery ↗") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
             }
@@ -43,7 +46,7 @@ struct DiscoveryView: View {
                     Spacer();Image(systemName:"arrow.up.right").foregroundStyle(.secondary)
                 }.padding(18).background(.white.opacity(0.04),in:RoundedRectangle(cornerRadius:18)) } .buttonStyle(.plain) }
             }
-        }.padding(24) }.background(AuraTheme.background).navigationBarHidden(true).fullScreenCover(isPresented:$showCamera) { CameraSheet(model:model,positioning:model.positioning) } }
+        }.padding(24) }.background(AuraTheme.background).navigationBarHidden(true).sheet(isPresented:$showEventPeople) { EventPeopleView(model:model) }.fullScreenCover(isPresented:$showCamera) { CameraSheet(model:model,positioning:model.positioning) } }
     }
 }
 struct DiscoveryStatus:View {
@@ -71,10 +74,17 @@ struct CameraSheet:View {
         }
         VStack(alignment:.leading,spacing:16) {
             HStack {
-                VStack(alignment:.leading,spacing:5) { Text("aura◌").font(.title.bold());Text("ROOM CAMERA · LIVE ONLY").font(.caption2).tracking(2) }
+                VStack(alignment:.leading,spacing:5) { AuraBrand(size:28);Text("ROOM CAMERA · LIVE ONLY").font(.caption2).tracking(2) }
                 Spacer()
                 Button { dismiss() } label: { Image(systemName:"xmark").padding(12).background(.black.opacity(0.55),in:Circle()) }.accessibilityLabel("Close room camera")
             }.padding().background(.black.opacity(0.55))
+            if positioning.worldTransform == nil {
+                VStack(alignment:.leading,spacing:8) {
+                    Text("No measured profiles in view").font(.headline)
+                    Text(positioning.peerID == nil ? "Camera placement needs an accepted positioning session with another compatible iPhone. It cannot position an Android phone in this build." : positioning.message).font(.subheadline)
+                    Text("The cards below are a nearby list; their placement does not follow people.").font(.caption).foregroundStyle(.secondary)
+                }.padding(18).background(.black.opacity(0.72),in:RoundedRectangle(cornerRadius:20)).padding(.horizontal,14)
+            }
             Spacer()
             VStack(alignment:.leading,spacing:12) {
                 HStack { Text(model.active ? "\(model.peers.count) nearby" : "Discovery paused").font(.headline);Spacer();Text("DEVNET").font(.caption2).foregroundStyle(AuraTheme.lime) }

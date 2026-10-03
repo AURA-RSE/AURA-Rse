@@ -1,5 +1,14 @@
 # Verification record
 
+## 2026-10-03 — separate event search and iPhone branding
+
+- Added an explicit opt-in event directory on iPhone and Android. Existing nearby Floating/List search and camera remain separate. Web and native profile editors expose the same visibility control; old profiles remain unlisted by default.
+- All 32 backend tests pass. New checks cover membership isolation, default privacy, invalid consent values, opt-out, Stealth, event leaving, bilateral blocks, media access revocation, and durable saved connections.
+- All five Android emulator instrumentation tests pass. The new test opens and filters event search without starting BLE or camera, then verifies that withdrawing consent removes the result. Existing camera-preview, nearby filtering, save-note and profile-draft regressions also pass. These use synthetic identities and do not prove physical camera positioning.
+- Android build/lint passed (0 errors, 26 warnings); web companion browser checks passed with fixture wallets/RPC. Unsigned and signed iOS builds passed. App icon PNGs and Assets.car are present in the iOS product. The signed update has not been installed on the currently disconnected physical iPhone.
+- Replaced the empty iOS app-icon asset with an opaque 1024px version of Aura's existing ring mark. Added the same mark to onboarding, Discover and room-camera branding.
+- The user's camera feedback is an unresolved spatial capability gap: Android has no measured placement, and the Apple path supports only one accepted compatible peer and still needs physical validation. New copy identifies an unpositioned nearby list explicitly. No multi-person camera success is claimed.
+
 ## 2026-10-02 — live room camera
 
 - Added local-only room-camera preview on Android and iPhone, authorized nearby-profile trays, profile opening, discovery controls, and permission handling. No recording, microphone capture, face matching, or image upload was added.

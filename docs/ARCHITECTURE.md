@@ -23,7 +23,7 @@ The API is intentionally small and runs on one Node process for a development pi
 | Signing keys | User's external wallet | Wallet only | Wallet-controlled; never collected by Aura |
 | API bearer session | iOS Keychain / Android Keystore-encrypted preferences / browser memory; hash in server DB | Account owner | Seven days; individual logout or account deletion |
 | Wallet challenge | SQLite | Public initiation; signature required | Five minutes, single-use |
-| Profile | SQLite JSON | Owner, current authorized discoverer, saved connection; blocks override | Until deleted |
+| Profile | SQLite JSON | Owner, current authorized discoverer, saved connection, or shared-event member while directory opt-in is on and status is visible; blocks override | Until deleted |
 | Uploaded avatar/video | SQLite BLOB | Same profile authorization | Replaced by owner or deleted with account |
 | Event/member records | SQLite | Authenticated memberships and owner operations | Until account/event lifecycle removes them |
 | Presence token | Phone memory; hash in SQLite | Same-event authenticated resolver with observed token | 90 seconds; rotation/revocation |
@@ -71,3 +71,11 @@ Foreground is the supported mode. Backgrounding pauses radio discovery and reque
 ## Recovery
 
 Schema migrations run at startup and refuse an unknown future version. Data defaults to `data/aura.sqlite`; `AURA_DB` overrides it. SQLite backup must include a consistent WAL-aware snapshot, not a naive copy while writes run. `scripts/backup.mjs` provides a SQLite `VACUUM INTO` snapshot. Backups contain private data and must receive retention/access controls before deployment.
+
+## Event directory
+
+`POST /api/events/people` requires membership in the requested event and returns only other members with `eventDirectory: true` and a non-Stealth status. Existing profiles default to unlisted. Each native client and the web profile editor exposes the opt-in and explains that it applies to events the person joins. The directory works without Bluetooth presence; it is not evidence that a member is physically in the room.
+
+Profile/media/payment authorization rechecks shared membership, visibility and blocking at request time. Directory reads do not mint lingering access grants. Opt-out, Stealth or leaving the shared event withdraws directory-based access immediately; independent saved-connection access remains intentional. Old clients that omit the new setting preserve the existing explicit choice. Lists refresh every five seconds while open, clear on errors/background, and recheck authorization before opening a profile. Previously disclosed information cannot be retroactively erased from another user's memory.
+
+The pilot returns the event's opted-in member list in one response. Pagination, large-event load testing and organizer membership controls remain production work.

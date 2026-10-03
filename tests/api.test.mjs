@@ -133,3 +133,51 @@ test('recipient deletion preserves another sender payment history but removes pr
  assert.equal((await f.request('/api/account',{confirm:'DELETE'},a.token,'DELETE')).status,200);
  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM payments').get().n,0);
 });
+
+
+test('event directory requires membership and explicit opt-in without Bluetooth presence',async t=>{
+ const f=await fixture(t),a=await f.login(),b=await f.login('Bob'),c=await f.login('Carol');
+ const list=(user,event='aura-lab')=>f.request('/api/events/people',{event},user.token);
+ assert.equal((await f.request('/api/events/people',{event:'aura-lab'})).status,401);
+ assert.deepEqual((await list(a)).profiles,[]);
+ const privateEvent=await f.request('/api/events',{name:'Private room'},c.token);
+ assert.equal((await list(a,privateEvent.id)).status,403);
+ assert.equal((await f.request('/api/me',{...draft('Bob'),eventDirectory:'true'},b.token,'PUT')).status,400);
+ await f.request('/api/me',{...draft('Bob'),eventDirectory:true},b.token,'PUT');
+ assert.deepEqual((await list(a)).profiles.map(p=>p.wallet),[b.wallet]);
+ assert.deepEqual((await list(b)).profiles,[]); // Never list yourself.
+ assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM presence').get().n,0);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,200);
+ const media=await f.request('/api/media',{kind:'avatar',base64:Buffer.from('89504e470d0a1a0a00000000','hex').toString('base64')},b.token);
+ const mediaStatus=async()=> (await fetch(f.base+'/api/media/'+media.id,{headers:{Authorization:'Bearer '+a.token}})).status;
+ assert.equal(await mediaStatus(),200);
+ await f.request('/api/me',{...draft('Bob'),eventDirectory:false},b.token,'PUT');
+ assert.deepEqual((await list(a)).profiles,[]);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
+ assert.equal(await mediaStatus(),404);
+ assert.equal((await f.request('/api/connections',{wallet:b.wallet,note:''},a.token,'PUT')).status,404);
+});
+
+test('directory honors stealth, blocks and event leaving while saved connections remain durable',async t=>{
+ const f=await fixture(t),a=await f.login(),b=await f.login('Bob');
+ const list=user=>f.request('/api/events/people',{event:'aura-lab'},user.token);
+ const visible=async(status='open')=>f.request('/api/me',{...draft('Bob',status),eventDirectory:true},b.token,'PUT');
+ await visible();await f.request('/api/me',draft('Bob updated'),b.token,'PUT');
+ assert.equal((await list(a)).profiles.length,1); // Older clients preserve explicit opt-in.
+ await visible('stealth');assert.equal((await list(a)).profiles.length,0);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
+ await visible();await f.request('/api/events/leave',{event:'aura-lab'},a.token);
+ assert.equal((await list(a)).status,403);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
+ await f.request('/api/events/join',{code:'AURA-LAB'},a.token);
+ assert.equal((await f.request('/api/connections',{wallet:b.wallet,note:'Keep in touch'},a.token,'PUT')).status,200);
+ await f.request('/api/events/leave',{event:'aura-lab'},b.token);
+ assert.equal((await list(a)).profiles.length,0);
+ assert.equal((await f.request('/api/connections',undefined,a.token)).connections.length,1);
+ await f.request('/api/events/join',{code:'AURA-LAB'},b.token);
+ await f.request('/api/blocks',{wallet:b.wallet},a.token);
+ assert.equal((await list(a)).profiles.length,0);
+ assert.equal((await list(b)).profiles.length,0);
+ assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
+ assert.equal((await f.request('/api/connections',undefined,a.token)).connections.length,0);
+});

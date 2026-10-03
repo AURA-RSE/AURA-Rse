@@ -4,7 +4,7 @@ struct ProfileSetupView: View {
     @State private var server = APIService.shared.baseURL
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:28) {
-            HStack { Text("aura◌").font(.system(size:42,weight:.bold,design:.rounded));Spacer();Text("DEVNET PILOT").font(.caption2.monospaced()).foregroundStyle(AuraTheme.lime) }
+            HStack { AuraBrand(size:42);Spacer();Text("DEVNET PILOT").font(.caption2.monospaced()).foregroundStyle(AuraTheme.lime) }
             Text("Your people.\nAlready in the room.").font(.system(size:40,weight:.semibold)).tracking(-1.5)
             Text("Bring your context. Choose to be seen. Find a reason to say hello.").foregroundStyle(.secondary)
             VStack(alignment:.leading,spacing:14) {

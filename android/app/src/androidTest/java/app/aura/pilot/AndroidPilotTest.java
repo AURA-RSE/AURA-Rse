@@ -54,6 +54,24 @@ public final class AndroidPilotTest {
             scenario.recreate();awaitText(scenario,"Builders around you.");assertEquals("Android UI verified",api.get("/api/me").getJSONObject("profile").getString("name"));
         }finally{store.clear(origin);context().getSharedPreferences("aura-settings",0).edit().clear().commit();}
     }
+    @Test public void eventDirectoryWorksWithoutDiscoveryAndWithdrawsOptOut() throws Exception {
+        var args=InstrumentationRegistry.getArguments();String origin=args.getString("auraOrigin"),token=args.getString("auraToken"),directoryToken=args.getString("auraDirectoryToken");assertNotNull(directoryToken);
+        SecureSession store=new SecureSession(context());store.save(origin,token);context().getSharedPreferences("aura-settings",0).edit().putString("server",origin).commit();
+        AuraApi directoryApi=new AuraApi(origin,directoryToken);
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            awaitText(scenario,"Builders around you.");Thread.sleep(300);
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Start discovery ↗"));text(root,"People at this event").performClick();});
+            awaitDialogText(scenario,"Directory fixture · Open-source tooling");
+            scenario.onActivity(a->{for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews())if(window.findViewWithTag("event-directory-search")!=null)((EditText)window.findViewWithTag("event-directory-search")).setText("no match");});
+            awaitDialogText(scenario,"0 participants · No matching visible profiles yet.");
+            scenario.onActivity(a->{for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews())if(window.findViewWithTag("event-directory-search")!=null)((EditText)window.findViewWithTag("event-directory-search")).setText("Directory");});
+            awaitDialogText(scenario,"Directory fixture · Open-source tooling");
+            var profile=directoryApi.get("/api/me").getJSONObject("profile");profile.put("eventDirectory",false);directoryApi.call("PUT","/api/me",profile);
+            awaitDialogText(scenario,"0 participants · No matching visible profiles yet.");
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Start discovery ↗"));assertNull(root.findViewWithTag("room-camera-preview"));});
+        }finally{store.clear(origin);context().getSharedPreferences("aura-settings",0).edit().clear().commit();}
+    }
     private static void setPrivate(Object object,String name,Object value){try{var f=object.getClass().getDeclaredField(name);f.setAccessible(true);f.set(object,value);}catch(Exception e){throw new AssertionError(e);}}
     private static void callPrivate(Object object,String name){try{var m=object.getClass().getDeclaredMethod(name);m.setAccessible(true);m.invoke(object);}catch(Exception e){throw new AssertionError(e);}}
     @Test public void floatingProfilesFilterOpenAndClearUsingAuthorizedApiFixtures() throws Exception {

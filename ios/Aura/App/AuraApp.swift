@@ -63,6 +63,8 @@ struct MyProfileView: View {
                     Section("Your profile") {
                         field("Name",\.name);field("Role",\.role);field("Project",\.project);field("Your story",\.bio);field("Project / social HTTPS link",\.link);field("Intro video HTTPS link",\.video)
                         Picker("Presence",selection:binding(\.status)) { Text("Stealth").tag("stealth");Text("Open to connect").tag("open");Text("Heads down").tag("heads-down") }
+                        Toggle("Show me in event search",isOn:Binding(get:{self.draft?.eventDirectory ?? false},set:{self.draft?.eventDirectory = $0}))
+                        Text("Members of events you join can find your profile without Bluetooth. Stealth hides you. Saved connections can revisit your profile.").font(.caption).foregroundStyle(.secondary)
                         ForEach(["Building","Hiring","Fundraising","Looking for a team","Offering feedback","Open to connect"],id:\.self) { intent in Toggle(intent,isOn:Binding(get:{self.draft?.intents.contains(intent) ?? false},set:{value in if value { self.draft?.intents.append(intent) } else { self.draft?.intents.removeAll{$0==intent} } })) }
                         Button("Save profile") { model.perform { if let value = self.draft { try await model.save(value);self.draft = model.profile } } }.disabled(model.busy)
                     }

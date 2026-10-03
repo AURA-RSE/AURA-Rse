@@ -40,6 +40,7 @@ export function profileInput(body) {
   const intents = ['Building', 'Hiring', 'Fundraising', 'Looking for a team', 'Offering feedback', 'Open to connect'];
   if (!statuses.includes(body.status)) fail(400, 'Invalid presence status');
   if (!Array.isArray(body.intents) || body.intents.length > 6 || body.intents.some(i => !intents.includes(i))) fail(400, 'Invalid intents');
-  return {name:text(body.name,60,true), role:text(body.role,80), project:text(body.project,100), bio:text(body.bio,500),
+  if (body.eventDirectory !== undefined && typeof body.eventDirectory !== 'boolean') fail(400, 'Invalid event directory setting');
+  return {eventDirectory:body.eventDirectory === true, name:text(body.name,60,true), role:text(body.role,80), project:text(body.project,100), bio:text(body.bio,500),
     link:httpsURL(body.link), video:httpsURL(body.video), intents:[...new Set(body.intents)], status:body.status};
 }
