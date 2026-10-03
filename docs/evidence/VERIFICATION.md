@@ -1,5 +1,15 @@
 # Verification record
 
+## 2026-10-03 — measured-camera prototype, iPhone build 2
+
+- Replaced the iPhone camera's unpositioned profile tray with markers projected from fresh NI world transforms through the current AR camera matrices. Preserved nearby search and event-directory browsing separately. Added in-camera positioning request/accept/stop controls and per-participant compatibility feedback.
+- Added separate iPhone NI sessions and a three-request application cap, with independent consent, cancellation, expiry, and interruption handling. The server requires current same-event presence and the matching client-declared protocol. Camera reset clears measurements; old network replies are gated by lifecycle/revision checks.
+- **36 backend tests pass**, including migration of v3 presence records to schema v4, incompatible-phone rejection, three-peer limits, wrong-recipient denial, expired presence, cancellation isolation, and fresh-session reset versus ordinary renewal.
+- **15 projection assertions pass** against the renderer's actual Swift helper: camera translation, turning away, multiple positions, offscreen/behind-camera hiding, invalid values, tracking loss, and monotonic freshness boundaries. These are synthetic geometry tests, not hardware accuracy evidence.
+- **Five Android emulator tests pass** against the upgraded server. The block test now supplies a fresh simulated observation for the remaining peer after editing notes, preventing unrelated 15-second observation expiry from contaminating its block assertion. Web companion fixture checks also pass.
+- Final iPhone **build 2** compiled and signed successfully; codesign verification passed. The phone is disconnected, so the update is not installed. The live pilot database/server has not been migrated in place; its backup and controlled restart are required before testing the new protocol.
+- Concurrent NI feasibility, physical marker alignment, moving-device accuracy, and occlusion remain unverified. Android spatial placement and event-wide coverage are not implemented. See `../ROOM-CAMERA.md` for the first physical test and upgrade steps.
+
 ## 2026-10-03 — separate event search and iPhone branding
 
 - Added an explicit opt-in event directory on iPhone and Android. Existing nearby Floating/List search and camera remain separate. Web and native profile editors expose the same visibility control; old profiles remain unlisted by default.

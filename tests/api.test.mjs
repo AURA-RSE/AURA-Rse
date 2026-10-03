@@ -15,7 +15,7 @@ async function fixture(t,options={}) {
  const base=`http://127.0.0.1:${app.server.address().port}`;
  const request=async(path,body,token,method=body===undefined?'GET':'POST',headers={})=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{ }),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});return {status:r.status,...await r.json()};};
  async function login(name='Alice'){const user=identity();const c=await request('/api/auth/challenge',{wallet:user.wallet});const signature=sign(null,Buffer.from(c.message),user.key).toString('base64');const r=await request('/api/auth/verify',{id:c.id,signature});assert.equal(r.status,200);user.token=r.token;await request('/api/me',draft(name),user.token,'PUT');await request('/api/events/join',{code:'AURA-LAB'},user.token);return user;}
- async function discover(a,b){const p=await request('/api/presence',{event:'aura-lab'},b.token);assert.equal(p.status,201);const r=await request('/api/discovery/resolve',{token:p.token},a.token);assert.equal(r.status,200);return p;}
+ async function discover(a,b,protocol=''){const p=await request('/api/presence',{event:'aura-lab',rangingProtocol:protocol},b.token);assert.equal(p.status,201);const r=await request('/api/discovery/resolve',{token:p.token},a.token);assert.equal(r.status,200);return p;}
  return {...app,request,login,discover,advance:n=>{time+=n;},base};
 }
 test('wallet signature required; proof bound to challenge and single-use',async t=>{const f=await fixture(t),a=identity(),b=identity();const c=await f.request('/api/auth/challenge',{wallet:a.wallet});assert.match(c.message,/Origin: http:\/\/localhost:4317/);assert.equal((await f.request('/api/auth/verify',{id:c.id,signature:sign(null,Buffer.from(c.message),b.key).toString('base64')})).status,401);const proof={id:c.id,signature:sign(null,Buffer.from(c.message),a.key).toString('base64')};assert.equal((await f.request('/api/auth/verify',proof)).status,200);assert.equal((await f.request('/api/auth/verify',proof)).status,401);});
@@ -25,7 +25,7 @@ test('rotation invalidates old token; stealth revokes resolve and unsaved grants
 test('private connections survive presence expiry but notes are not shared',async t=>{const f=await fixture(t),a=await f.login(),b=await f.login('Bob');const p=await f.discover(a,b);await f.request('/api/connections',{wallet:b.wallet,note:'private follow-up'},a.token,'PUT');f.advance(120001);assert.equal((await f.request('/api/discovery/resolve',{token:p.token},a.token)).status,404);await f.request('/api/me',draft('Bob','stealth'),b.token,'PUT');assert.equal((await f.request('/api/presence',{event:'aura-lab'},b.token)).status,409);assert.equal((await f.request('/api/connections',undefined,a.token)).connections[0].note,'private follow-up');assert.equal((await f.request('/api/connections',undefined,b.token)).connections.length,0);assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,200);});
 test('blocking removes access in both directions including saved connections',async t=>{const f=await fixture(t),a=await f.login(),b=await f.login('Bob');const p=await f.discover(a,b);await f.discover(b,a);await f.request('/api/connections',{wallet:b.wallet,note:''},a.token,'PUT');assert.equal((await f.request('/api/blocks',{wallet:b.wallet},a.token)).status,200);assert.equal((await f.request('/api/profiles/read',{wallet:a.wallet},b.token)).status,404);assert.equal((await f.request('/api/discovery/resolve',{token:p.token},a.token)).status,404);assert.equal((await f.request('/api/connections',undefined,a.token)).connections.length,0);assert.equal((await f.request('/api/payments',{wallet:b.wallet,amount:'0.1'},a.token)).status,404);});
 test('device pairing requires authenticated approval; exchange is single-use',async t=>{const f=await fixture(t),a=await f.login();const d=await f.request('/api/device/start',{});assert.equal((await f.request('/api/device/poll',{deviceSecret:d.deviceSecret})).state,'pending');assert.equal((await f.request('/api/device/approve',{code:d.code})).status,401);assert.equal((await f.request('/api/device/approve',{code:d.code},a.token)).status,200);const poll=await f.request('/api/device/poll',{deviceSecret:d.deviceSecret});assert.equal(poll.profile.wallet,a.wallet);assert.ok(poll.token);assert.equal((await f.request('/api/device/poll',{deviceSecret:d.deviceSecret})).status,404);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE hash=?').get(poll.token).n,0);});
-test('positioning token relay requires mutual event presence and recipient consent',async t=>{const f=await fixture(t),a=await f.login(),b=await f.login('Bob'),c=await f.login('Carol');await f.discover(a,b);await f.discover(b,a);const r=await f.request('/api/ranging',{wallet:b.wallet,discoveryToken:'dG9rZW4='},a.token);assert.equal(r.status,201);assert.equal((await f.request('/api/ranging',undefined,c.token)).requests.length,0);assert.equal((await f.request('/api/ranging/accept',{id:r.id,discoveryToken:'dG9rZW4='},c.token)).status,404);assert.equal((await f.request('/api/ranging',undefined,a.token)).requests[0].recipient_token,null);assert.equal((await f.request('/api/ranging/accept',{id:r.id,discoveryToken:'cGVlcg=='},b.token)).status,200);await f.request('/api/presence',{},b.token,'DELETE');assert.equal((await f.request('/api/ranging',undefined,a.token)).requests.length,0);});
+test('positioning token relay requires mutual event presence and recipient consent',async t=>{const f=await fixture(t),a=await f.login(),b=await f.login('Bob'),c=await f.login('Carol');await f.discover(a,b,'apple-ni-v2');await f.discover(b,a,'apple-ni-v2');const r=await f.request('/api/ranging',{wallet:b.wallet,discoveryToken:'dG9rZW4='},a.token);assert.equal(r.status,201);assert.equal((await f.request('/api/ranging',undefined,c.token)).requests.length,0);assert.equal((await f.request('/api/ranging/accept',{id:r.id,discoveryToken:'dG9rZW4='},c.token)).status,404);assert.equal((await f.request('/api/ranging',undefined,a.token)).requests[0].recipient_token,null);assert.equal((await f.request('/api/ranging/accept',{id:r.id,discoveryToken:'cGVlcg=='},b.token)).status,200);await f.request('/api/presence',{},b.token,'DELETE');assert.equal((await f.request('/api/ranging',undefined,a.token)).requests.length,0);});
 test('payment verification rejects pending, failed, wrong recipient, and wrong amount',async t=>{let result=null;const f=await fixture(t,{rpc:async()=>result}),a=await f.login(),b=await f.login('Bob');await f.discover(a,b);const p=await f.request('/api/payments',{wallet:b.wallet,amount:'0.000000001'},a.token);assert.equal(p.lamports,1);const signature=bs58.encode(randomBytes(64));const confirm=()=>f.request('/api/payments/confirm',{id:p.id,signature},a.token);assert.equal((await confirm()).state,'pending');result={meta:{err:{failure:true}}};assert.equal((await confirm()).status,409);const instruction={programId:'11111111111111111111111111111111',parsed:{type:'transfer',info:{source:a.wallet,destination:b.wallet,lamports:2}}};result={meta:{err:null},transaction:{message:{accountKeys:[{pubkey:a.wallet,signer:true},{pubkey:p.reference,signer:false}],instructions:[instruction]}}};assert.equal((await confirm()).status,409);instruction.parsed.info.lamports=1;instruction.parsed.info.destination=a.wallet;assert.equal((await confirm()).status,409);instruction.parsed.info.destination=b.wallet;assert.equal((await confirm()).state,'confirmed');assert.equal((await confirm()).signature,signature);assert.equal((await f.request('/api/payments/confirm',{id:p.id,signature},b.token)).status,404);});
 test('account export is isolated; deletion cascades; origin and unauthenticated access blocked',async t=>{const f=await fixture(t),a=await f.login(),b=await f.login('Bob');await f.discover(a,b);await f.request('/api/connections',{wallet:b.wallet,note:'private'},a.token,'PUT');assert.equal((await f.request('/api/account/export',undefined,b.token)).connections.length,0);assert.equal((await f.request('/api/me',undefined,a.token,'GET',{Origin:'https://evil.test'})).status,403);assert.equal((await f.request('/api/me')).status,401);assert.equal((await f.request('/api/account',{confirm:'wrong'},a.token,'DELETE')).status,400);assert.equal((await f.request('/api/account',{confirm:'DELETE'},a.token,'DELETE')).status,200);assert.equal((await f.request('/api/me',undefined,a.token)).status,401);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM connections').get().n,0);});
 test('profile storage persists across process/store reopening',async t=>{const dir=await mkdtemp(join(tmpdir(),'aura-test-'));t.after(()=>rm(dir,{recursive:true,force:true}));const path=join(dir,'aura.sqlite');const app=createAura({dbPath:path});const a=identity();app.db.prepare('INSERT INTO profiles VALUES(?,?,?)').run(a.wallet,JSON.stringify(draft('Durable')),Date.now());app.server.emit('close');const second=createAura({dbPath:path});assert.equal(JSON.parse(second.db.prepare('SELECT data FROM profiles WHERE wallet=?').get(a.wallet).data).name,'Durable');second.server.emit('close');});
@@ -180,4 +180,45 @@ test('directory honors stealth, blocks and event leaving while saved connections
  assert.equal((await list(b)).profiles.length,0);
  assert.equal((await f.request('/api/profiles/read',{wallet:b.wallet},a.token)).status,404);
  assert.equal((await f.request('/api/connections',undefined,a.token)).connections.length,0);
+});
+
+
+test('positioning rejects non-capable phones and independently relays up to three consenting peers',async t=>{
+ const f=await fixture(t),a=await f.login(),peers=await Promise.all(['One','Two','Three','Four'].map(n=>f.login(n)));
+ const request=b=>f.request('/api/ranging',{wallet:b.wallet,discoveryToken:'dG9rZW4='},a.token);
+ await f.discover(a,peers[0]);await f.discover(peers[0],a,'apple-ni-v2');
+ assert.equal((await request(peers[0])).status,409);
+ const ids=[];
+ for(const b of peers){await f.discover(a,b,'apple-ni-v2');}
+ for(const b of peers.slice(0,3)){const q=await request(b);assert.equal(q.status,201);ids.push(q.id);}
+ assert.equal((await request(peers[0])).status,409);assert.equal((await request(peers[3])).status,409);
+ assert.equal((await f.request('/api/ranging',undefined,a.token)).requests.length,3);
+ assert.equal((await f.request('/api/ranging/accept',{id:ids[0],discoveryToken:'cGVlcg=='},peers[1].token)).status,404);
+ assert.equal((await f.request('/api/ranging/accept',{id:ids[0],discoveryToken:'bad!'},peers[0].token)).status,400);
+ assert.equal((await f.request('/api/ranging/accept',{id:ids[0],discoveryToken:'cGVlcg=='},peers[0].token)).status,200);
+ await f.request('/api/ranging',{id:ids[0]},a.token,'DELETE');
+ assert.equal((await f.request('/api/ranging',undefined,a.token)).requests.length,2);
+ assert.equal((await request(peers[3])).status,201);
+ await f.request('/api/presence',{event:'aura-lab',rangingProtocol:''},peers[1].token);
+ assert.equal((await f.request('/api/ranging',undefined,a.token)).requests.length,2);
+ assert.equal((await f.request('/api/ranging/accept',{id:ids[1],discoveryToken:'cGVlcg=='},peers[1].token)).status,404);
+});
+
+test('positioning requests stop being visible when presence expires and cannot then be accepted',async t=>{
+ const f=await fixture(t),a=await f.login(),b=await f.login();await f.discover(a,b,'apple-ni-v2');await f.discover(b,a,'apple-ni-v2');
+ const q=await f.request('/api/ranging',{wallet:b.wallet,discoveryToken:'dG9rZW4='},a.token);
+ f.advance(90001);
+ assert.deepEqual((await f.request('/api/ranging',undefined,a.token)).requests,[]);
+ assert.equal((await f.request('/api/ranging/accept',{id:q.id,discoveryToken:'cGVlcg=='},b.token)).status,404);
+});
+
+
+test('renewal keeps positioning handshakes while a fresh discovery session resets them',async t=>{
+ const f=await fixture(t),a=await f.login(),b=await f.login();await f.discover(a,b,'apple-ni-v2');await f.discover(b,a,'apple-ni-v2');
+ const q=await f.request('/api/ranging',{wallet:b.wallet,discoveryToken:'dG9rZW4='},a.token);
+ await f.request('/api/presence',{event:'aura-lab',rangingProtocol:'apple-ni-v2'},a.token);
+ assert.equal((await f.request('/api/ranging',undefined,a.token)).requests[0].id,q.id);
+ await f.request('/api/presence',{event:'aura-lab',rangingProtocol:'apple-ni-v2',resetRanging:true},a.token);
+ assert.deepEqual((await f.request('/api/ranging',undefined,b.token)).requests,[]);
+ assert.equal((await f.request('/api/ranging/accept',{id:q.id,discoveryToken:'cGVlcg=='},b.token)).status,404);
 });

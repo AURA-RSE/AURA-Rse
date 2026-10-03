@@ -1,0 +1,5 @@
+
+> aura-proximity@0.3.0 test:spatial
+> bash scripts/test-spatial.sh
+
+PASS: 15 measured-position projection assertions. Synthetic geometry; not physical UWB/AR evidence.

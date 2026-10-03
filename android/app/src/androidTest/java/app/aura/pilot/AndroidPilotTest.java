@@ -136,7 +136,9 @@ public final class AndroidPilotTest {
             android.graphics.Bitmap screenshot=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(screenshot);
             java.io.File destination=new java.io.File(context().getExternalFilesDir(null),"nearby-test-fixtures.png");try(var stream=new java.io.FileOutputStream(destination)){screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream);}screenshot.recycle();
             // The peer was already blocked for the rejected-save check above.
-            scenario.onActivity(a->a.onToken("fixture-builder",peerToken,-50));
+            // Simulate the next radio observation; the other peer may have aged out
+            // while editing notes. Keep freshness independent from the block assertion.
+            scenario.onActivity(a->{a.onToken("fixture-hiring",otherToken,-55);a.onToken("fixture-builder",peerToken,-50);});
             awaitText(scenario,"LIVE IN YOUR EVENT · 1 nearby");
             scenario.onActivity(a->{View root=a.findViewById(android.R.id.content);assertNull(root.findViewWithTag("nearby-profile-"+peerWallet));try{var field=MainActivity.class.getDeclaredField("peers");field.setAccessible(true);for(Object peer:((java.util.Map<?,?>)field.get(a)).values())setPrivate(peer,"expires",System.currentTimeMillis()-1);}catch(Exception e){throw new AssertionError(e);}callPrivate(a,"renderPeers");assertNotNull(text(root,"LIVE IN YOUR EVENT · 0 nearby"));});
             scenario.onActivity(a->{callPrivate(a,"stopDiscovery");View root=a.findViewById(android.R.id.content);assertNotNull(text(root,"Choose when to be seen"));assertNull(root.findViewWithTag("nearby-profile-"+peerWallet));});

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
 export const REPORT_RETENTION_MS = 90 * 86400000;
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export function openStore(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive:true, mode:0o700 });
@@ -57,6 +57,17 @@ export function openStore(path) {
       try { db.exec('ROLLBACK'); } catch { /* BEGIN may itself have failed. */ }
       db.close();
       throw error;
+    }
+  }
+  if (version < 4) {
+    try {
+      db.exec(`BEGIN IMMEDIATE;
+        ALTER TABLE presence ADD COLUMN ranging_protocol TEXT NOT NULL DEFAULT '';
+        INSERT INTO schema_version VALUES(4);
+        COMMIT;`);
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch {}
+      db.close();throw error;
     }
   }
   return db;

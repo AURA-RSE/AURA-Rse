@@ -46,3 +46,13 @@ test('store rejects an unknown future schema',async t => {
  db.prepare('INSERT INTO schema_version VALUES(?)').run(SCHEMA_VERSION+1);db.close();
  assert.throws(()=>openStore(path),/Unsupported database schema/);
 });
+
+
+test('schema v3 presence migration preserves tokens and defaults to no positioning capability',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'aura-presence-migration-'));t.after(()=>rm(dir,{recursive:true,force:true}));const path=join(dir,'legacy.sqlite');
+ const db=openStore(path);db.exec("ALTER TABLE presence DROP COLUMN ranging_protocol; DELETE FROM schema_version WHERE version=4;");
+ db.prepare('INSERT INTO profiles VALUES(?,?,?)').run('peer','{}',1);db.prepare('INSERT INTO events VALUES(?,?,?,?,?)').run('event',null,'Event','CODE',1);
+ db.prepare('INSERT INTO presence VALUES(?,?,?,?)').run('token','peer','event',9999999999999);db.close();
+ const upgraded=openStore(path);const p=upgraded.prepare('SELECT * FROM presence').get();assert.equal(p.hash,'token');assert.equal(p.ranging_protocol,'');assert.equal(p.wallet,'peer');upgraded.close();
+ const reopened=openStore(path);assert.equal(reopened.prepare('SELECT COUNT(*) AS n FROM presence').get().n,1);reopened.close();
+});

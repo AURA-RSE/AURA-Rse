@@ -25,7 +25,7 @@ struct Presence: Decodable { let token: String; let expires: Double; let event: 
 struct DeviceStart: Decodable { let deviceSecret: String; let code: String; let expires: Double }
 struct DevicePoll: Decodable { let state: String; let token: String?; let profile: AuraProfile? }
 struct ProfileResponse: Decodable { let profile: AuraProfile }
-struct ResolveResponse: Decodable { let profile: AuraProfile; let event: String; let expires: Double }
+struct ResolveResponse: Decodable { let profile: AuraProfile; let event: String; let expires: Double; let rangingProtocol: String? }
 struct EventPeopleResponse: Decodable { let event: String; let profiles: [AuraProfile] }
 struct EventsResponse: Decodable { let events: [AuraEvent] }
 struct EmptyResponse: Decodable {}
@@ -42,5 +42,6 @@ struct NearbyPeer: Identifiable {
     var lastSeen: Date
     var expires: Double
     var rssi: Int
+    var rangingProtocol: String?
     var id: String { profile.wallet }
 }

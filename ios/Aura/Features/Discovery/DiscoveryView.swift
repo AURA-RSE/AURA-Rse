@@ -58,61 +58,105 @@ struct DiscoveryStatus:View {
 struct CameraSheet:View {
     @ObservedObject var model:DiscoveryViewModel
     @ObservedObject var positioning:UWBSessionManager
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var phase
-    @State private var cameraAllowed = false
-    @State private var permissionChecked = false
+    @State private var cameraAllowed=false
+    @State private var permissionChecked=false
     @State private var cameraPeer:AuraProfile?
-    var body:some View { ZStack {
-        Color.black.ignoresSafeArea()
-        if cameraAllowed && phase == .active {
-            ARAuraView(positioning:positioning,name:model.peers.first(where:{$0.id==positioning.peerID})?.profile.name ?? "Participant",select:{
-                cameraPeer = model.peers.first(where:{$0.id==positioning.peerID})?.profile
-            }).ignoresSafeArea()
-        } else if permissionChecked {
-            ContentUnavailableView("Camera access is off",systemImage:"camera",description:Text("Allow Camera for Aura in Settings, or use nearby profiles without it.")).foregroundStyle(.white)
-        }
-        VStack(alignment:.leading,spacing:16) {
-            HStack {
-                VStack(alignment:.leading,spacing:5) { AuraBrand(size:28);Text("ROOM CAMERA · LIVE ONLY").font(.caption2).tracking(2) }
-                Spacer()
-                Button { dismiss() } label: { Image(systemName:"xmark").padding(12).background(.black.opacity(0.55),in:Circle()) }.accessibilityLabel("Close room camera")
-            }.padding().background(.black.opacity(0.55))
-            if positioning.worldTransform == nil {
-                VStack(alignment:.leading,spacing:8) {
-                    Text("No measured profiles in view").font(.headline)
-                    Text(positioning.peerID == nil ? "Camera placement needs an accepted positioning session with another compatible iPhone. It cannot position an Android phone in this build." : positioning.message).font(.subheadline)
-                    Text("The cards below are a nearby list; their placement does not follow people.").font(.caption).foregroundStyle(.secondary)
-                }.padding(18).background(.black.opacity(0.72),in:RoundedRectangle(cornerRadius:20)).padding(.horizontal,14)
+    @State private var showPositioning=false
+    private var incoming:Int { model.requests.filter{$0.recipient==model.profile?.wallet && $0.recipient_token==nil}.count }
+    var body:some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if cameraAllowed && phase == .active {
+                ARAuraView(positioning:positioning,profiles:model.peers.map(\.profile),select:{ wallet in cameraPeer=model.peers.first(where:{$0.id==wallet})?.profile }).ignoresSafeArea()
+            } else if permissionChecked {
+                ContentUnavailableView("Camera access is off",systemImage:"camera",description:Text("Allow Camera for Aura in Settings. Event search remains available."))
             }
-            Spacer()
             VStack(alignment:.leading,spacing:12) {
-                HStack { Text(model.active ? "\(model.peers.count) nearby" : "Discovery paused").font(.headline);Spacer();Text("DEVNET").font(.caption2).foregroundStyle(AuraTheme.lime) }
-                Text(positioning.worldTransform == nil ? "Nearby profiles · positions not yet measured" : "Measured device marker · tap to open profile").font(.caption).foregroundStyle(.secondary)
-                if positioning.peerID != nil { Text(positioning.message).font(.caption);if let distance=positioning.distance { Text("\(distance,specifier:"%.2f") m to device").font(.caption.monospaced()) } }
-                if let error=model.error { Text(error).font(.caption).foregroundStyle(.orange) }
-                ScrollView(.horizontal,showsIndicators:false) { HStack(spacing:12) {
-                    ForEach(model.peers.sorted{$0.profile.name<$1.profile.name}) { peer in
-                        Button { cameraPeer=peer.profile } label: {
-                            HStack(spacing:10) { NearbyAvatar(profile:peer.profile,size:40);VStack(alignment:.leading,spacing:4) { Text(peer.profile.name).font(.headline);Text(peer.profile.role).font(.caption);Text(peer.profile.project).font(.caption).foregroundStyle(AuraTheme.lime) } }
-                            .frame(width:220,alignment:.leading).padding(14).background(.white.opacity(0.09),in:RoundedRectangle(cornerRadius:20))
-                        }.buttonStyle(.plain).accessibilityHint("Open this nearby profile; its camera position is not implied")
+                HStack {
+                    VStack(alignment:.leading,spacing:4) { AuraBrand(size:28);Text("ROOM CAMERA · BUILD \(Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "—")").font(.caption2).tracking(2) }
+                    Spacer()
+                    Button { dismiss() } label: { Image(systemName:"xmark").padding(12).background(.black.opacity(0.6),in:Circle()) }.accessibilityLabel("Close room camera")
+                }.padding().background(.black.opacity(0.55))
+                if positioning.measurements.isEmpty {
+                    VStack(alignment:.leading,spacing:8) {
+                        Text(model.active ? "Ready to position profiles" : "Start discovery to begin").font(.headline)
+                        Text(model.active ? "Choose a compatible participant below. Once they accept and a position is measured, their profile will appear at their device as you turn." : "Both participants need active discovery in the same event.").font(.subheadline)
+                    }.padding(18).background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:20)).padding(.horizontal,14)
+                }
+                Spacer()
+                VStack(alignment:.leading,spacing:10) {
+                    HStack { Text("\(positioning.measurements.count) measured devices").font(.headline);Spacer();Text("DEVNET").font(.caption2).foregroundStyle(AuraTheme.lime) }
+                    Text(positioning.cameraMessage).font(.caption).foregroundStyle(.secondary)
+                    if let error=model.error { Text(error).font(.caption).foregroundStyle(.orange) }
+                    if !positioning.supportsCamera { Text("This phone cannot place measured profiles in the camera view.").font(.caption).foregroundStyle(.orange) }
+                    if incoming>0 { Button("\(incoming) positioning request\(incoming==1 ? "" : "s") · Review") { showPositioning=true }.buttonStyle(.borderedProminent).foregroundStyle(.black) }
+                    HStack {
+                        Button(model.active ? "Position people" : "Start discovery") {
+                            if model.active { showPositioning=true } else { model.perform { try await model.start();showPositioning=true } }
+                        }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy || !cameraAllowed)
+                        if model.active { Button("Pause") { model.perform { await model.stop() } }.buttonStyle(.bordered) }
                     }
-                } }
-                if model.peers.isEmpty { Text(model.active ? "Keep Aura open on both phones in the same event." : "Start discovery to see opted-in profiles in this room.").font(.subheadline) }
-                Button(model.active ? "Pause discovery" : "Start discovery") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
-                Text("Camera stays on your phone. Nothing is recorded.").font(.caption2).foregroundStyle(.secondary)
-            }.padding(20).background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:26)).padding(.horizontal,14).padding(.bottom,12)
-        }.foregroundStyle(.white)
-    }.task {
-        switch AVCaptureDevice.authorizationStatus(for:.video) {
-        case .authorized: cameraAllowed=true
-        case .notDetermined: cameraAllowed=await AVCaptureDevice.requestAccess(for:.video)
-        default: cameraAllowed=false
+                    Text("Up to three accepted devices. Cards follow measured device positions; they do not identify faces. Camera stays on your phone.").font(.caption2).foregroundStyle(.secondary)
+                    Button("Browse people without camera") { dismiss() }.font(.caption)
+                }.padding(18).background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:24)).padding(.horizontal,14).padding(.bottom,12)
+            }.foregroundStyle(.white)
+        }.task {
+            switch AVCaptureDevice.authorizationStatus(for:.video) {
+            case .authorized:cameraAllowed=true
+            case .notDetermined:cameraAllowed=await AVCaptureDevice.requestAccess(for:.video)
+            default:cameraAllowed=false
+            }
+            permissionChecked=true
+        }.sheet(item:$cameraPeer) { peer in PeerDetailView(model:model,peer:peer) }
+        .sheet(isPresented:$showPositioning) { PositioningPeopleView(model:model,positioning:positioning) }
+        .onDisappear { Task { await model.endPositioning() } }
+    }
+}
+
+struct PositioningPeopleView:View {
+    @ObservedObject var model:DiscoveryViewModel
+    @ObservedObject var positioning:UWBSessionManager
+    @Environment(\.dismiss) private var dismiss
+    var body:some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Ask a participant to share their device position for up to two minutes. Point the backs of both phones toward each other to acquire the first measurement, then return to the camera.").font(.subheadline)
+                    Text("This build positions compatible iPhones. Android profiles remain available in nearby and event search.").font(.caption).foregroundStyle(.secondary)
+                }
+                if let error=model.error { Section { Text(error).foregroundStyle(.orange) } }
+                Section("Positioning sessions") {
+                    if model.requests.isEmpty { Text("No positioning sessions yet.").foregroundStyle(.secondary) }
+                    ForEach(model.requests) { request in
+                        VStack(alignment:.leading,spacing:8) {
+                            Text(request.peer.name).font(.headline)
+                            Text(positioning.messages[request.peer.wallet] ?? (request.recipient_token==nil ? "Waiting for approval" : "Waiting for a measurement")).font(.caption).foregroundStyle(.secondary)
+                            HStack {
+                                if request.recipient==model.profile?.wallet && request.recipient_token==nil {
+                                    Button("Accept position sharing") { model.perform { try await model.accept(request) } }.disabled(model.busy)
+                                }
+                                Button("Stop",role:.destructive) { model.perform { try await model.dismiss(request) } }.disabled(model.busy)
+                            }.buttonStyle(.bordered)
+                        }
+                    }
+                }
+                Section("Nearby participants") {
+                    if model.peers.isEmpty { Text("Keep both phones open in the same event with discovery active.").foregroundStyle(.secondary) }
+                    ForEach(model.peers.sorted{$0.profile.name<$1.profile.name}) { peer in
+                        VStack(alignment:.leading,spacing:8) {
+                            HStack { NearbyAvatar(profile:peer.profile,size:36);VStack(alignment:.leading) { Text(peer.profile.name).font(.headline);Text(peer.profile.role).font(.caption).foregroundStyle(.secondary) } }
+                            if peer.rangingProtocol != "apple-ni-v2" { Text("Camera positioning unavailable on this participant’s current app or device.").font(.caption).foregroundStyle(.secondary) }
+                            else if !model.requests.contains(where:{$0.peer.wallet==peer.id}) {
+                                Button("Request positioning") { model.perform { try await model.requestPosition(peer.profile) } }.disabled(model.busy || !model.active || !positioning.supportsDistance || positioning.peerIDs.count>=UWBSessionManager.peerLimit)
+                            }
+                        }
+                    }
+                }
+            }.navigationTitle("Position people").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Camera") { dismiss() } } }
         }
-        permissionChecked=true
-    }.sheet(item:$cameraPeer) { peer in PeerDetailView(model:model,peer:peer) }
-    .onDisappear { Task { await model.endPositioning() } }
     }
 }
 struct PeerDetailView:View {
@@ -128,7 +172,7 @@ struct PeerDetailView:View {
         Section("Media") { ProfileMediaView(profile:peer,api:model.api) }
         Section("Explore") { if let url = URL(string:peer.link),url.scheme=="https" { Link("Project / social ↗",destination:url) };if let url = URL(string:peer.video),url.scheme=="https" { Link("Watch intro ↗",destination:url) };Text(peer.intents.joined(separator:" · ")) }
         Section("Remember this connection") { TextField("Private note",text:$note,axis:.vertical);Button(saved ? "Saved ✓" : "Save connection") { model.perform { try await model.saveConnection(peer,note:note);saved = true } } }
-        Section("Positioning") { Button("Request device positioning") { model.perform { try await model.requestPosition(peer) } }.disabled(!model.active);Text("The other participant must accept. Open the camera from Discover after acceptance. Device position does not prove who is holding it.").font(.caption).foregroundStyle(.secondary) }
+        Section("Positioning") { Button("Request device positioning") { model.perform { try await model.requestPosition(peer) } }.disabled(!model.active || model.busy || !model.peers.contains(where:{$0.id==peer.wallet && $0.rangingProtocol=="apple-ni-v2"}));Text("Compatible participants must accept. Open Room Camera to see a profile at a fresh measured device position. Device position does not prove who is holding it.").font(.caption).foregroundStyle(.secondary) }
         Section("Send devnet SOL") { TextField("Amount",text:$amount).keyboardType(.decimalPad);Button("Review in your wallet browser ↗") { model.perform { let url = try await model.payment(peer,amount:amount);openURL(url) } };Text("Nothing is sent until you review and approve in your wallet. Maximum 1 devnet SOL per pilot payment.").font(.caption).foregroundStyle(.secondary) }
         Section("Safety") { Text("Safety reports remain for 90 days, including after account deletion. Include only information needed to review the incident.").font(.caption); TextField("Describe a concern",text:$report,axis:.vertical);Button("Submit report") { model.perform { try await model.report(peer,reason:report);report = "";model.error = "Report stored for pilot operator review." } }.disabled(report.isEmpty);Button("Block participant",role:.destructive) { model.perform { try await model.block(peer) } } }
     }.navigationTitle("Their Aura").navigationBarTitleDisplayMode(.inline).onAppear { note = model.connections.first(where:{$0.target==peer.wallet})?.note ?? "" } } }

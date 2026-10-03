@@ -75,7 +75,7 @@ struct MyProfileView: View {
                     if let url = URL(string:model.api.baseURL) { Link("Export, delete, and manage blocks ↗",destination:url) }
                     Button("Sign out",role:.destructive) { Task { await model.logout() } }
                 }
-                Section("Pilot capabilities") { Text("Foreground Bluetooth discovery. One accepted positioning peer at a time. Spatial cards require measured camera-assisted coordinates. Android and multi-peer spatial validation remain on the roadmap.").font(.caption) }
+                Section("Pilot capabilities") { Text("Foreground Bluetooth discovery. Up to three separately accepted positioning peers. Spatial cards require measured camera-assisted coordinates. Physical multi-peer accuracy and Android positioning remain unverified.").font(.caption) }
             }.navigationTitle("My Aura").onAppear { draft = model.profile }
         }
     }

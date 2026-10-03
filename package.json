@@ -16,7 +16,8 @@
     "backup": "node scripts/backup.mjs",
     "android:build": "bash scripts/build-android.sh :app:assembleDebug :app:lintDebug",
     "android:test": "bash scripts/test-android-rules.sh",
-    "android:test:device": "node scripts/test-android-device.mjs"
+    "android:test:device": "node scripts/test-android-device.mjs",
+    "test:spatial": "bash scripts/test-spatial.sh"
   },
   "dependencies": {
     "@solana/web3.js": "1.98.4",

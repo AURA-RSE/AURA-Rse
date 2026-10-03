@@ -1,34 +1,44 @@
 # Aura room camera
 
-The intended experience is to open a live camera, look around an event, and open opted-in participant profiles from the camera view. Discovery, wallet verification, and spatial placement are separate capabilities.
+Room Camera is intended to let participants turn around an event and open profiles at measured device locations. Identity authorization, camera preview, and positional measurement are separate capabilities.
 
-## Implemented in this build
+## Current implementation
 
-- Android: CameraX rear-camera preview with explicit runtime permission, lifecycle-bound capture, a responsive nearby-profile tray, and links to saved connections. Opening a profile uses the same authenticated flow as Discover. Pausing discovery clears nearby cards. Closing the camera or leaving the app releases or suspends camera capture.
-- iPhone: a full-screen ARKit camera with explicit permission, nearby-profile tray, profile sheets, discovery controls, and positioning status. One accepted Nearby Interaction peer can have a tappable profile marker at its measured device position. The marker updates with the camera frame and hides when positioning or camera tracking is unavailable.
-- Images stay on the device. This feature contains no image uploads, face matching, video recording, or microphone capture.
+**iPhone:** the camera canvas now contains only measured profile markers. It no longer presents a nearby-card tray as camera search. Each marker is projected from a fresh Nearby Interaction world transform through the current camera view and projection matrices. Turning away hides it. Lost tracking, expired measurements, leaving the event, stopping a session, and disappearing peers remove markers. A marker identifies a consenting participant's device; it does not recognize the person holding it.
 
-## What profile placement means
+A separate **Position people** panel shows compatible nearby participants, sends positioning requests, and lets recipients accept or stop them. The app and relay cap sessions at three participants per device. That is an application cap, not a hardware concurrency guarantee. Each participant has a separate NI session, discovery token, approval, timeout, measurement and stop action. Late network replies cannot resurrect a stopped local session. The camera is configured according to Apple's shared-session requirements and does not attempt relocalization after an interruption.
 
-Nearby trays show event-scoped profiles resolved from Bluetooth tokens. Their order is for browsing and does not represent bearing, distance, a person in the camera frame, or device coordinates. They remain labeled as unpositioned.
+**Android:** CameraX preview and the explicitly unpositioned nearby tray remain available. Android does not advertise the Apple positioning protocol and cannot be selected for this iPhone positioning path. No Android UWB/ARCore positioning is claimed.
 
-The iPhone measured marker uses Nearby Interaction and the shared AR session. It marks the other device, not a biometric identification of the person holding it. The participant must accept positioning first. Physical camera-registration accuracy is still unverified.
+Both platforms retain the original searchable nearby Floating/List view and the separate opt-in event directory. The directory does not imply physical proximity. No images are uploaded, recorded, or matched against faces by these features.
 
-Android camera preview does not implement UWB/ARCore positioning. This iPhone/Android pair can test a live preview and authorized nearby profiles, but cannot validate the existing Apple-to-Apple positioning path. Room-wide, multi-person anchored overlays remain unimplemented; a camera background alone is not that capability.
+## First physical positioning test
 
-## Physical checks
+1. Update the server and both compatible iPhones. Join the same event using distinct verified Aura profiles; choose a visible status and start discovery.
+2. On the viewing phone, open **Room Camera → Position people** and request a compatible participant.
+3. On the other phone, review and accept the request. Camera permission is requested before camera-assisted positioning starts. An incompatible or old client is shown as unavailable for positioning.
+4. Return to Camera. Point the backs of the phones toward each other to acquire the initial measurement. An empty camera is expected until NI provides a valid world transform.
+5. With one phone held still, rotate the viewing phone. The marker should follow the measured device location, leave the view when the device does, and reopen the correct profile when tapped. Record alignment error, distance, lighting, acquisition delay and lost measurements.
+6. Move the target phone and repeat. Then test two and three accepted peers. Hardware session-limit errors must stop the affected session visibly rather than invent a marker. Measure whether simultaneous camera-assisted sessions are actually supported on the tested devices.
+7. Test cancellation, denial, Stealth, blocking, backgrounding, lost network, lost Bluetooth, expired sessions and camera interruptions. Repeat after rotating the viewing phone and after restarting the app.
 
-1. Update each app, preserve the existing wallet session, and join the same event with distinct test wallets.
-2. Open room camera. Check camera permission acceptance, denial, portrait/landscape layout, and return from background. The camera indicator must stop when leaving the camera or backgrounding the app.
-3. Start discovery on both devices. Check that fresh authorized profiles appear in the camera tray, open their details, save a note, and retrieve it without discovery.
-4. Pause discovery or enter Stealth and verify cards clear. A physical Stealth regression remains pending after the Android profile-draft fix.
-5. With a second compatible iPhone, request and accept positioning, then verify measured-marker alignment, movement, out-of-view hiding, occlusion, expiry, and tap behavior against the physical scene. Record failures and missing measurements.
-6. Do not label tray browsing as positional AR or the emulator camera as a physical device result.
+The current iPhone–Samsung test pair cannot validate Apple-to-Apple ranging. A second compatible iPhone is needed for the first physical result, and additional phones for concurrency. The software checks below are not substitutes for that evidence.
 
-## Camera limitation reported during manual use — 2026-10-03
+## Software verification
 
-The user reported that camera search behaved like the existing search over a camera feed. This is a valid limitation report, not a successful spatial test. The Android tray is still a nearby list, and the iPhone camera cannot place profiles without a fresh accepted Nearby Interaction measurement. Both interfaces now make the absence of positional capability explicit. Do not describe these changes as a fix for multi-person camera discovery.
+- `npm test`: authenticated relay, bilateral consent, capability rejection, three-request bounds, independent cancellation, expired presence, fresh-session reset, and v3-to-v4 presence migration.
+- `npm run test:spatial`: 15 assertions against the renderer's actual projection helper, including camera translation/rotation, multiple positions, offscreen and behind-camera devices, invalid coordinates, tracking loss and measurement freshness. Geometry is synthetic.
+- iOS signed build: verifies framework integration compiles and produces a signed artifact, not physical UWB accuracy.
+- Android emulator and web fixture checks: verify existing non-spatial flows remain compatible with the upgraded server.
 
-The separate **People at this event** directory preserves browsing without opening the camera or starting BLE discovery. It lists explicitly opted-in visible members, supports name/role/project and intent filtering, and does not imply physical proximity. The existing nearby Floating/List search remains available.
+No full-room coverage, physical accuracy threshold, simultaneous NI capacity, or cross-platform spatial success has been demonstrated yet.
 
-The next physical positioning test requires two compatible Apple devices. The existing `NINearbyPeerConfiguration` path is Apple-to-Apple; it does not position an Android peer. See [Apple's peer configuration](https://developer.apple.com/documentation/nearbyinteraction/ninearbypeerconfiguration). Cross-platform room coverage needs an additional measured positioning design and validation. A camera preview, BLE signal strength, arbitrary card coordinates, and face matching are not substitutes for that work.
+## Server upgrade
+
+Schema v4 adds `presence.ranging_protocol`, defaulting existing phones to no positioning capability. Stop the old Aura server and back up its SQLite database before restarting the new code; do not run an old and new server against this database together. Migration preserves existing token rows. New iPhone discovery advertises `apple-ni-v2`; normal renewals preserve handshakes, while an explicit fresh start clears obsolete handshakes. Capabilities are client-declared compatibility hints, not hardware attestation.
+
+## Apple API references
+
+- [NISession: one session per nearby object](https://developer.apple.com/documentation/nearbyinteraction/nisession)
+- [Sharing an ARSession and its required configuration](https://developer.apple.com/documentation/nearbyinteraction/nisession/setarsession(_:))
+- [Apple peer positioning configuration](https://developer.apple.com/documentation/nearbyinteraction/ninearbypeerconfiguration)

@@ -23,6 +23,12 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
   const blocked = (a,b) => get('SELECT 1 FROM blocks WHERE (owner=? AND target=?) OR (owner=? AND target=?)',a,b,b,a);
   const directoryVisible = (a,b) => { const p=profile(b);return p?.eventDirectory === true && p.status !== 'stealth' && get('SELECT 1 FROM members a JOIN members b ON a.event=b.event WHERE a.wallet=? AND b.wallet=? LIMIT 1',a,b); };
   const canRead = (a,b) => a===b || (!blocked(a,b) && (directoryVisible(a,b) || get('SELECT 1 FROM access WHERE viewer=? AND target=? AND expires>?',a,b,now()) || get('SELECT 1 FROM connections WHERE owner=? AND target=?',a,b)));
+  const rangingPresence = (a,b) => {
+    const first=get('SELECT * FROM presence WHERE wallet=? AND expires>?',a,now());
+    const second=get('SELECT * FROM presence WHERE wallet=? AND expires>?',b,now());
+    return first && second && first.event===second.event && first.ranging_protocol==='apple-ni-v2' && second.ranging_protocol==='apple-ni-v2'
+      && !blocked(a,b) && profile(a)?.status!=='stealth' && profile(b)?.status!=='stealth';
+  };
   const session = w => {const token=secret(); run('INSERT INTO sessions VALUES(?,?,?)',hash(token),w,now()+7*86400000); return token;};
   const revokePresence = w => {run('DELETE FROM presence WHERE wallet=?',w);run('DELETE FROM access WHERE target=?',w);run('DELETE FROM ranging WHERE sender=? OR recipient=?',w,w);};
   const sweep = () => {for(const table of ['challenges','sessions','presence','access','devices','ranging','reports']) run(`DELETE FROM ${table} WHERE expires<=?`,now()); run('DELETE FROM payments WHERE signature IS NULL AND submitted_signature IS NULL AND expires<?',now()-86400000);};
@@ -119,7 +125,13 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
         const p=profile(me);if(!p.name||p.status==='stealth')fail(409,'Complete your profile and choose a discoverable status first');
         const event=text(body.event,100,true);if(!get('SELECT 1 FROM members WHERE event=? AND wallet=?',event,me))fail(403,'Join this event first');
         const token=secret(16),expires=now()+90000;
-        run('DELETE FROM presence WHERE wallet=?',me);run('INSERT INTO presence VALUES(?,?,?,?)',hash(token),me,event,expires);
+        const protocol=body.rangingProtocol ?? '';
+        if(!['','apple-ni-v2'].includes(protocol))fail(400,'Unsupported positioning protocol');
+        if(body.resetRanging!==undefined && typeof body.resetRanging!=='boolean')fail(400,'Invalid positioning reset');
+        if(body.resetRanging===true)run('DELETE FROM ranging WHERE sender=? OR recipient=?',me,me);
+        const previous=get('SELECT event,ranging_protocol FROM presence WHERE wallet=?',me);
+        if(previous && (previous.event!==event || previous.ranging_protocol!==protocol))revokePresence(me);
+        run('DELETE FROM presence WHERE wallet=?',me);run('INSERT INTO presence(hash,wallet,event,expires,ranging_protocol) VALUES(?,?,?,?,?)',hash(token),me,event,expires,protocol);
         return respond(201,{token,expires,event});
       }
       if(route==='DELETE /api/presence'){revokePresence(me);return respond(200,{ok:true});}
@@ -128,7 +140,7 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
         if(!p || p.wallet===me || blocked(me,p.wallet) || !get('SELECT 1 FROM members WHERE event=? AND wallet=?',p.event,me))fail(404,'Presence unavailable');
         const target=profile(p.wallet);if(target.status==='stealth')fail(404,'Presence unavailable');
         run('INSERT INTO access VALUES(?,?,?) ON CONFLICT(viewer,target) DO UPDATE SET expires=excluded.expires',me,p.wallet,now()+120000);
-        return respond(200,{profile:target,event:p.event,expires:p.expires});
+        return respond(200,{profile:target,event:p.event,expires:p.expires,rangingProtocol:p.ranging_protocol});
       }
       if(route==='POST /api/profiles/read') {
         const target=wallet(body.wallet);if(!canRead(me,target))fail(404,'Profile unavailable');return respond(200,{profile:profile(target)});
@@ -155,15 +167,17 @@ export function createAura({dbPath = 'data/aura.sqlite', origin = 'http://localh
       }
       if(route==='POST /api/ranging') {
         const target=wallet(body.wallet);if(target===me||!canRead(me,target))fail(404,'Participant unavailable');
-        const a=get('SELECT event FROM presence WHERE wallet=? AND expires>?',me,now()),b=get('SELECT event FROM presence WHERE wallet=? AND expires>?',target,now());
-        if(!a||!b||a.event!==b.event)fail(409,'Both devices must be present in the same event');
-        if(get('SELECT 1 FROM ranging WHERE (sender IN (?,?) OR recipient IN (?,?)) AND expires>?',me,target,me,target,now()))fail(409,'A positioning request is already active');
+        if(!rangingPresence(me,target))fail(409,'Both phones must support Apple positioning and be present in the same event');
+        if(get('SELECT 1 FROM ranging WHERE ((sender=? AND recipient=?) OR (sender=? AND recipient=?)) AND expires>?',me,target,target,me,now()))fail(409,'Positioning with this participant is already requested');
+        for(const participant of [me,target])if(get('SELECT COUNT(*) AS n FROM ranging WHERE (sender=? OR recipient=?) AND expires>?',participant,participant,now()).n>=3)fail(409,'Three positioning requests are already active. Stop one before adding another.');
         const token=text(body.discoveryToken,4096,true);if(!/^[A-Za-z0-9+/]+=*$/.test(token))fail(400,'Invalid discovery token');
         const id=secret(12);run('INSERT INTO ranging VALUES(?,?,?,?,?,?)',id,me,target,token,null,now()+120000);return respond(201,{id});
       }
-      if(route==='GET /api/ranging')return respond(200,{requests:all('SELECT * FROM ranging WHERE (sender=? OR recipient=?) AND expires>?',me,me,now()).filter(r=>!blocked(r.sender,r.recipient)).map(r=>({...r,peer:profile(r.sender===me?r.recipient:r.sender)}))});
+      if(route==='GET /api/ranging')return respond(200,{requests:all('SELECT * FROM ranging WHERE (sender=? OR recipient=?) AND expires>?',me,me,now()).filter(r=>rangingPresence(r.sender,r.recipient)).map(r=>({...r,peer:profile(r.sender===me?r.recipient:r.sender)}))});
       if(route==='POST /api/ranging/accept') {
         const id=text(body.id,100,true),token=text(body.discoveryToken,4096,true);if(!/^[A-Za-z0-9+/]+=*$/.test(token))fail(400,'Invalid discovery token');
+        const pending=get('SELECT * FROM ranging WHERE id=? AND recipient=? AND recipient_token IS NULL AND expires>?',id,me,now());
+        if(!pending || !rangingPresence(pending.sender,me))fail(404,'Positioning request unavailable');
         const result=run('UPDATE ranging SET recipient_token=? WHERE id=? AND recipient=? AND recipient_token IS NULL AND expires>?',token,id,me,now());if(!result.changes)fail(404,'Positioning request expired');return respond(200,{ok:true});
       }
       if(route==='DELETE /api/ranging'){run('DELETE FROM ranging WHERE id=? AND (sender=? OR recipient=?)',text(body.id,100,true),me,me);return respond(200,{ok:true});}

@@ -71,7 +71,7 @@ INSTRUMENTATION_STATUS: test=restoredSessionEditsProfileThroughRealApi
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 31.642
+Time: 21.385
 
 OK (5 tests)
 
