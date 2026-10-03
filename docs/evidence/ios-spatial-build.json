@@ -4,7 +4,10 @@
   "configuration": "Debug development",
   "signedBuild": "passed",
   "codeSignatureVerification": "passed",
-  "physicalInstallation": "pending",
+  "physicalInstallation": "installed; device reports build 2",
   "physicalPositioningValidation": "pending",
-  "scope": "Measured projection and up to three independently accepted positioning sessions; concurrent radio capacity not yet verified."
+  "scope": "Measured projection and up to three independently accepted positioning sessions; concurrent radio capacity not yet verified.",
+  "applicationLaunch": "automatic launch blocked by device lock; manual open pending",
+  "pilotServerSchema": 4,
+  "migrationDataIntegrity": "verified against private pre-upgrade snapshot"
 }

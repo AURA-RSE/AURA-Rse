@@ -1,5 +1,11 @@
 # Verification record
 
+## 2026-10-03 — build 2 installed and pilot server upgraded
+
+- Installed the signed iPhone update; a device app query reports Aura build 2. Automatic launch was blocked by the device locking again. Manual camera operation and spatial accuracy remain unverified.
+- Stopped the verified Aura process, created and integrity-checked a private SQLite backup, and restarted the updated server on its existing local address. Health reports schema 4 and devnet.
+- Compared profiles, events, memberships, saved connections, payments and media against the snapshot: row counts and full-table fingerprints match. Database integrity and foreign-key checks pass. Raw device logs, database snapshots and identifiers remain outside public evidence.
+
 ## 2026-10-03 — measured-camera prototype, iPhone build 2
 
 - Replaced the iPhone camera's unpositioned profile tray with markers projected from fresh NI world transforms through the current AR camera matrices. Preserved nearby search and event-directory browsing separately. Added in-camera positioning request/accept/stop controls and per-participant compatibility feedback.
