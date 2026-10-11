@@ -16,6 +16,8 @@ final class DiscoveryViewModel: ObservableObject {
     @Published var payments: [PaymentRecord] = []
     @Published var requests: [RangingRequest] = []
     @Published var pairing: DeviceStart?
+    @Published var pairingStatus = ""
+    private var pairingGeneration = 0
     @Published var busy = false
     @Published var active = false
     @Published var error: String?
@@ -48,17 +50,41 @@ final class DiscoveryViewModel: ObservableObject {
         do { let result:ProfileResponse = try await api.request("/api/me"); profile = result.profile;try await refresh() } catch { self.error = error.localizedDescription }
     }
     func pair(server:String) async throws {
-        stopLocal();polling?.cancel();try api.configure(server:server)
-        let result:DeviceStart = try await api.request("/api/device/start",method:"POST",body:[:]);pairing = result
+        stopLocal();polling?.cancel();pairingGeneration += 1
+        let current = pairingGeneration
+        pairing = nil;pairingStatus = "Checking server…"
+        let result:DeviceStart
+        do {
+            try api.configure(server:server)
+            try await api.checkServer()
+            result = try await api.request("/api/device/start",method:"POST",body:[:])
+        } catch { pairingStatus = "";throw error }
+        guard current == pairingGeneration else { return }
+        pairing = result;pairingStatus = "Waiting for your approval…"
         polling = Task { [weak self] in
             while !Task.isCancelled && Date().timeIntervalSince1970 * 1000 < result.expires {
                 do {
-                    try await Task.sleep(for:.seconds(2));guard !Task.isCancelled,let self else { return }
+                    try await Task.sleep(for:.seconds(3))
+                    guard !Task.isCancelled,let self,current == self.pairingGeneration else { return }
                     let reply:DevicePoll = try await self.api.request("/api/device/poll",method:"POST",body:["deviceSecret":result.deviceSecret])
-                    if let token = reply.token { try self.api.authorize(token);self.profile = reply.profile;self.pairing = nil;try await self.refresh();return }
-                } catch { if !Task.isCancelled { self?.error = error.localizedDescription };return }
+                    guard !Task.isCancelled,current == self.pairingGeneration else { return }
+                    if let token = reply.token {
+                        try self.api.authorize(token);self.profile = reply.profile;self.pairing = nil;self.pairingStatus = ""
+                        do { try await self.refresh() } catch { self.error = error.localizedDescription }
+                        return
+                    }
+                    self.pairingStatus = "Waiting for your approval…"
+                } catch {
+                    guard !Task.isCancelled,let self,current == self.pairingGeneration else { return }
+                    if let transport = error as? APIError,case .connection(let message) = transport {
+                        self.pairingStatus = message + " Retrying while this code is valid."
+                        continue
+                    }
+                    self.pairing = nil;self.pairingStatus = "";self.error = error.localizedDescription;return
+                }
             }
-            self?.pairing = nil
+            guard !Task.isCancelled,let self,current == self.pairingGeneration else { return }
+            self.pairing = nil;self.pairingStatus = "Code expired. Generate a new code to continue."
         }
     }
     func refresh() async throws {

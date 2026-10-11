@@ -2,7 +2,7 @@
 
 Aura brings opt-in discovery and wallet-linked identity to Solana gatherings. Native iOS and Android apps connect nearby participants through a shared backend, web wallet companion, and JavaScript SDK.
 
-**Status:** development pilot with compiled iOS and Android apps and automated API, browser, and Android checks. Physical cross-platform discovery, spatial accuracy, and live wallet compatibility still require validation. See [capabilities](docs/CAPABILITIES.md) for implementation status and remaining work.
+**Status:** working development prototype with native iPhone and Android apps, physical single-pair discovery observations, a verified Android wallet sign-in, and reproducible software checks. iPhone measured camera placement is implemented but awaits compatible-device validation; Android spatial placement is not implemented. Start with the [reviewer brief](docs/SUBMISSION.md), [verification record](docs/evidence/VERIFICATION.md) and [capability matrix](docs/CAPABILITIES.md).
 
 Source repository: [AURA-RSE/AURA-Rse](https://github.com/AURA-RSE/AURA-Rse). Aura is maintained as a standalone project. The original supplied iOS project is preserved separately; the revised Xcode project is `ios/Aura.xcodeproj`. Local databases, credentials, toolchains, build caches and generated handoff bundles are excluded from Git.
 
@@ -38,7 +38,7 @@ For a **physical iPhone or Android phone**, localhost points to the phone itself
 HOST=0.0.0.0 AURA_ORIGIN=http://YOUR-MAC-LAN-IP:4317 npm start
 ```
 
-Use that exact origin in both the browser and phone. Debug builds permit local HTTP; **release builds require HTTPS**. Use devnet-only test accounts on a private LAN; do not expose this development server directly to the public internet. HTTPS deployment and production hardening are tracked prerequisites, not completed work. Android now offers native Solana Mobile Wallet Adapter sign-in and payment signing, with the web companion as fallback. iOS signing currently uses the web companion. Actual native-wallet compatibility remains a device acceptance gate.
+Use that exact origin in both the browser and phone. Debug builds permit local HTTP; **release builds require HTTPS**. Use devnet-only test accounts on a private LAN; do not expose this development server directly to the public internet. HTTPS deployment and production hardening are tracked prerequisites, not completed work. Android now offers native Solana Mobile Wallet Adapter sign-in and payment signing, with the web companion as fallback. iOS signing currently uses the web companion. One physical Samsung/Solflare sign-in is recorded; broader wallet compatibility and a confirmed wallet-approved devnet transfer remain acceptance gates.
 
 ## Verification
 

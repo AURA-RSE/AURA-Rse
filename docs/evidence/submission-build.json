@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-11",
+  "ios": {
+    "build": "3",
+    "unsignedBuild": "passed",
+    "signedBuild": "passed",
+    "strictSignatureVerification": "passed",
+    "physicalInstallation": "not performed for this update"
+  },
+  "android": {
+    "versionCode": 4,
+    "versionName": "0.3.0",
+    "debugBuild": "passed",
+    "lintErrors": 0,
+    "lintWarnings": 26,
+    "emulatorTestsPassed": 5,
+    "physicalInstallation": "not performed for this update"
+  },
+  "backendTestsPassed": 36,
+  "projectionAssertionsPassed": 15,
+  "androidDiscoveryAssertionsPassed": 14,
+  "androidTransactionAssertionsPassed": 416,
+  "browserIntegration": "passed including device pairing; generated wallets and mocked RPC",
+  "hosting": "not provisioned; container recipe not executed",
+  "physicalSpatialValidation": "pending",
+  "externalWalletDevnetReceipt": "pending"
+}

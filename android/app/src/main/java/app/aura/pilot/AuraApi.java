@@ -60,6 +60,8 @@ final class AuraApi {
                 throw new Failure(status, message);
             }
             return result.toByteArray();
+        } catch (java.net.SocketTimeoutException | java.net.ConnectException | java.net.UnknownHostException | java.net.NoRouteToHostException error) {
+            throw new Failure(0, "Cannot reach Aura at " + origin + ". Check the server address and connection. For a local pilot, keep the Mac running and connect both devices to the same Wi-Fi.");
         } finally { connection.disconnect(); }
     }
     static JSONObject object(Object... values) {

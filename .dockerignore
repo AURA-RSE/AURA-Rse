@@ -1,0 +1,13 @@
+*
+!Dockerfile
+!package.json
+!package-lock.json
+!server/
+!server/**
+!web/
+!web/**
+!packages/
+!packages/**
+!scripts/
+!scripts/build.mjs
+!scripts/backup.mjs

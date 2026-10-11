@@ -11,7 +11,7 @@ with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         for name in sorted(files):
             path = Path(folder) / name
             if path == output or path.is_symlink() or name in {'.DS_Store', 'local.properties', '.env'}: continue
-            if name.startswith('.env.') or name.endswith(('.log', '.jks', '.keystore', '.xcuserstate', '.sqlite', '.sqlite-wal', '.sqlite-shm')): continue
+            if name.startswith('.env.') or name.endswith(('.log', '.jks', '.keystore', '.p12', '.p8', '.pem', '.key', '.mobileprovision', '.xcuserstate', '.sqlite', '.sqlite-wal', '.sqlite-shm')): continue
             archive.write(path, Path('Aura') / path.relative_to(root))
 with zipfile.ZipFile(output) as archive:
     assert archive.testzip() is None

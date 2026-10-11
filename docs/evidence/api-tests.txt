@@ -1,43 +1,52 @@
 
+> aura-proximity@0.3.0 check
+> npm run build && npm test
+
+
+> aura-proximity@0.3.0 build
+> node scripts/build.mjs
+
+Aura web companion built
+
 > aura-proximity@0.3.0 test
 > node --test tests/*.test.mjs
 
-✔ wallet signature required; proof bound to challenge and single-use (75.366667ms)
-✔ expired challenges and sessions are rejected (14.039125ms)
-✔ profiles cannot be enumerated; event membership and presence required (14.695708ms)
-✔ rotation invalidates old token; stealth revokes resolve and unsaved grants (21.231959ms)
-✔ private connections survive presence expiry but notes are not shared (15.117ms)
-✔ blocking removes access in both directions including saved connections (11.975083ms)
-✔ device pairing requires authenticated approval; exchange is single-use (8.372333ms)
-✔ positioning token relay requires mutual event presence and recipient consent (13.399291ms)
-✔ payment verification rejects pending, failed, wrong recipient, and wrong amount (23.250083ms)
-✔ account export is isolated; deletion cascades; origin and unauthenticated access blocked (14.543584ms)
-✔ profile storage persists across process/store reopening (14.642458ms)
-✔ uploaded media persists privately, supports replacement and deletion (11.538459ms)
-✔ malformed payment signature returns a client error (9.229333ms)
-✔ signed payment persists before uncertain RPC and cannot be submitted twice (64.024875ms)
-✔ signed transaction changing the reviewed amount is rejected before RPC (12.076833ms)
-✔ backup command produces a restorable SQLite snapshot (113.624041ms)
-✔ cleanup preserves unresolved submitted signatures for recovery (28.186917ms)
-✔ native payment preparation fixes sender, recipient, amount and reference in one unsigned transfer (22.689292ms)
-✔ native payment preparation rechecks expiry and blocking after blockhash lookup (14.219125ms)
-✔ native payment preparation rejects invalid upstream blockhash response without signing or submission (15.79625ms)
-✔ reports survive target deletion and detach a deleted reporter without exposing reports to others (44.119625ms)
-✔ reports expire at the original deadline and are hidden from export before the next sweep (14.612167ms)
-✔ recipient deletion preserves another sender payment history but removes profile and media (9.746542ms)
-✔ event directory requires membership and explicit opt-in without Bluetooth presence (14.673375ms)
-✔ directory honors stealth, blocks and event leaving while saved connections remain durable (15.285959ms)
-✔ positioning rejects non-capable phones and independently relays up to three consenting peers (24.780791ms)
-✔ positioning requests stop being visible when presence expires and cannot then be accepted (9.084583ms)
-✔ renewal keeps positioning handshakes while a fresh discovery session resets them (9.243125ms)
-✔ SOL amounts use exact integer conversion and pilot limits (0.931584ms)
-✔ profile input rejects unsafe links, invalid status, and unbounded text (0.2185ms)
-✔ spatial visibility requires a fresh measured transform (0.567292ms)
-✔ base58 rejects invalid characters and preserves zero public key (0.197875ms)
-✔ schema v1 migration preserves reports and original retention deadlines across reopen (34.051875ms)
-✔ schema v2 migration preserves reports and original retention deadlines across reopen (15.195459ms)
-✔ store rejects an unknown future schema (11.398459ms)
-✔ schema v3 presence migration preserves tokens and defaults to no positioning capability (9.539709ms)
+✔ wallet signature required; proof bound to challenge and single-use (39.635417ms)
+✔ expired challenges and sessions are rejected (13.831708ms)
+✔ profiles cannot be enumerated; event membership and presence required (10.713584ms)
+✔ rotation invalidates old token; stealth revokes resolve and unsaved grants (10.538125ms)
+✔ private connections survive presence expiry but notes are not shared (11.448ms)
+✔ blocking removes access in both directions including saved connections (10.295667ms)
+✔ device pairing requires authenticated approval; exchange is single-use (8.360459ms)
+✔ positioning token relay requires mutual event presence and recipient consent (12.555917ms)
+✔ payment verification rejects pending, failed, wrong recipient, and wrong amount (11.686375ms)
+✔ account export is isolated; deletion cascades; origin and unauthenticated access blocked (9.628625ms)
+✔ profile storage persists across process/store reopening (8.051958ms)
+✔ uploaded media persists privately, supports replacement and deletion (8.658167ms)
+✔ malformed payment signature returns a client error (8.300917ms)
+✔ signed payment persists before uncertain RPC and cannot be submitted twice (60.979209ms)
+✔ signed transaction changing the reviewed amount is rejected before RPC (11.635208ms)
+✔ backup command produces a restorable SQLite snapshot (78.831417ms)
+✔ cleanup preserves unresolved submitted signatures for recovery (7.555916ms)
+✔ native payment preparation fixes sender, recipient, amount and reference in one unsigned transfer (16.551541ms)
+✔ native payment preparation rechecks expiry and blocking after blockhash lookup (9.571417ms)
+✔ native payment preparation rejects invalid upstream blockhash response without signing or submission (9.053541ms)
+✔ reports survive target deletion and detach a deleted reporter without exposing reports to others (17.336458ms)
+✔ reports expire at the original deadline and are hidden from export before the next sweep (11.2825ms)
+✔ recipient deletion preserves another sender payment history but removes profile and media (8.735375ms)
+✔ event directory requires membership and explicit opt-in without Bluetooth presence (13.561125ms)
+✔ directory honors stealth, blocks and event leaving while saved connections remain durable (12.226292ms)
+✔ positioning rejects non-capable phones and independently relays up to three consenting peers (36.44725ms)
+✔ positioning requests stop being visible when presence expires and cannot then be accepted (9.27225ms)
+✔ renewal keeps positioning handshakes while a fresh discovery session resets them (10.4265ms)
+✔ SOL amounts use exact integer conversion and pilot limits (0.998666ms)
+✔ profile input rejects unsafe links, invalid status, and unbounded text (0.302833ms)
+✔ spatial visibility requires a fresh measured transform (0.104375ms)
+✔ base58 rejects invalid characters and preserves zero public key (0.176667ms)
+✔ schema v1 migration preserves reports and original retention deadlines across reopen (18.222084ms)
+✔ schema v2 migration preserves reports and original retention deadlines across reopen (13.069583ms)
+✔ store rejects an unknown future schema (7.624792ms)
+✔ schema v3 presence migration preserves tokens and defaults to no positioning capability (9.949542ms)
 ℹ tests 36
 ℹ suites 0
 ℹ pass 36
@@ -45,4 +54,9 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 983.337792
+ℹ duration_ms 696.77725
+npm notice
+npm notice New minor version of npm available! 11.12.1 -> 11.21.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.0
+npm notice To update run: npm install -g npm@11.21.0
+npm notice

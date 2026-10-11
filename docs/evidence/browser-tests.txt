@@ -2,4 +2,4 @@
 > aura-proximity@0.3.0 test:browser
 > node tests/browser.mjs
 
-PASS: desktop/mobile layout, wallet challenge, profile save, event join, saved connection, reviewed signed payment, verified receipt, durable avatar upload. RPC and wallets were test fixtures.
+PASS: desktop/mobile layout, wallet challenge, real API device pairing and event-code rejection, profile save, event join, saved connection, reviewed signed payment, verified receipt, durable avatar upload. RPC and wallets were test fixtures.

@@ -1,7 +1,7 @@
 {
-  "date": "2026-09-28T18:09:13.574Z",
+  "date": "2026-10-11T09:40:39.374Z",
   "network": "devnet",
   "test": "generated-wallet SOL transfer",
   "status": "not_completed",
-  "reason": "airdrop to Gmg9UH49T2as4aoBn5LVSU5V4gXDSXx3QoC6Vfo8gjE1 failed: Internal error"
+  "reason": "airdrop to G8u1r9NzxvJjsFgaEMiFgS98R62eaZPLWcQkSH1kDTEw failed: Internal error"
 }

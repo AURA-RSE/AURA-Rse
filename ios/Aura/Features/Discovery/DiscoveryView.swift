@@ -20,6 +20,7 @@ struct DiscoveryView: View {
             Text("Find a collaborator. Meet your next team.").font(.subheadline).foregroundStyle(.secondary)
             Picker("Event",selection:$model.selectedEvent) { Text("Choose an event").tag("");ForEach(model.events) { Text($0.name).tag($0.id) } }.disabled(model.active)
             Button { showCamera = true } label: { Label("Open room camera",systemImage:"camera.fill").frame(maxWidth:.infinity) }.buttonStyle(.borderedProminent).foregroundStyle(.black)
+            Text("Room Camera positions consenting, compatible iPhones. Android participants remain available in nearby search and the event directory.").font(.caption).foregroundStyle(.secondary)
             Button { showEventPeople = true } label: { Label("People at this event",systemImage:"person.2.fill").frame(maxWidth:.infinity) }.buttonStyle(.bordered).disabled(model.selectedEvent.isEmpty)
             HStack {
                 Button(model.active ? "Pause discovery" : "Start discovery ↗") { model.perform { if model.active { await model.stop() } else { try await model.start() } } }.buttonStyle(.borderedProminent).foregroundStyle(.black).disabled(model.busy)
@@ -36,6 +37,7 @@ struct DiscoveryView: View {
             HStack { Text(model.active ? "LIVE IN YOUR EVENT" : "DISCOVERY PAUSED").font(.caption2).tracking(2);Spacer();Text("\(filtered.count) nearby").font(.caption).foregroundStyle(AuraTheme.lime) }
             Text("Opt-in profiles discovered nearby. Cards are arranged for browsing; exact positions are not shown.").font(.caption).foregroundStyle(.secondary)
             if filtered.isEmpty {
+                if !model.peers.isEmpty && (!query.isEmpty || intent != "All") { Button("Clear search and filters") { query = "";intent = "All" }.buttonStyle(.bordered) }
                 ContentUnavailableView(!model.active ? "Choose when to be seen" : model.peers.isEmpty ? "Your next connection is nearby" : "Try another filter",systemImage:"person.2.wave.2",description:Text(!model.active ? "Join an event in My Aura and choose a visible status to start." : model.peers.isEmpty ? "Keep both phones open in the same event. Profiles appear when their devices are discovered." : "No nearby profiles match this search and intent."))
             } else if presentation == "Floating" {
                 NearbyProfileField(peers:filtered) { model.selectedPeer = $0 }
@@ -64,6 +66,13 @@ struct CameraSheet:View {
     @State private var permissionChecked=false
     @State private var cameraPeer:AuraProfile?
     @State private var showPositioning=false
+    private var compatiblePeers:Int { model.peers.filter { $0.rangingProtocol == "apple-ni-v2" }.count }
+    private var cameraHelp:String {
+        if !model.active { return "Start discovery on both phones in the same event." }
+        if compatiblePeers == 0 && !model.peers.isEmpty { return "Nearby participants were found, but none support this iPhone positioning build. Android profiles are available in nearby search; they cannot be positioned in this camera." }
+        if compatiblePeers == 0 { return "Keep a second compatible iPhone open in Aura with discovery active. Choose Position people when it appears. Nearby search also supports Android." }
+        return "Choose Position people and request a compatible participant. Their profile appears only after they accept and a position is measured."
+    }
     private var incoming:Int { model.requests.filter{$0.recipient==model.profile?.wallet && $0.recipient_token==nil}.count }
     var body:some View {
         ZStack {
@@ -81,8 +90,8 @@ struct CameraSheet:View {
                 }.padding().background(.black.opacity(0.55))
                 if positioning.measurements.isEmpty {
                     VStack(alignment:.leading,spacing:8) {
-                        Text(model.active ? "Ready to position profiles" : "Start discovery to begin").font(.headline)
-                        Text(model.active ? "Choose a compatible participant below. Once they accept and a position is measured, their profile will appear at their device as you turn." : "Both participants need active discovery in the same event.").font(.subheadline)
+                        Text(!model.active ? "Start discovery to begin" : compatiblePeers == 0 ? "Waiting for a compatible iPhone" : "Ready to position profiles").font(.headline)
+                        Text(cameraHelp).font(.subheadline)
                     }.padding(18).background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:20)).padding(.horizontal,14)
                 }
                 Spacer()

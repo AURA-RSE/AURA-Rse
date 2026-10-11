@@ -86,7 +86,7 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
                 main.post(() -> {
                     if (destroyed || epoch != authEpoch) return;
                     if (error instanceof AuraApi.Failure && ((AuraApi.Failure)error).status == 401 && token != null) { clearSession();message("Session expired. Verify your wallet and pair again.");return; }
-                    if (failed != null) { try { failed.accept(AuraApi.object("error", safeMessage(error))); } catch (Exception e) { problem(e); } }
+                    if (failed != null) { try { failed.accept(AuraApi.object("error", safeMessage(error), "retryable", error instanceof AuraApi.Failure && ((AuraApi.Failure)error).status == 0 || error instanceof java.io.IOException)); } catch (Exception e) { problem(e); } }
                     else problem(error);
                 });
             }
@@ -133,15 +133,25 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         title(body,"Your people.\nAlready in the room.");body.addView(text("Connect your identity, choose to be seen, and find a reason to say hello.",16,MUTED));
         EditText server = field(body,"Aura server origin",origin,300);server.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
         body.addView(text("Android emulator: http://10.0.2.2:4317. A physical phone needs your Mac’s LAN address or an HTTPS server. Use that same origin in the browser.",12,MUTED));
+        button(body,"Check server connection",()->{
+            try {
+                String candidate=AuraApi.normalize(server.getText().toString(),BuildConfig.DEBUG);
+                message("Checking server…");
+                request(c->new AuraApi(candidate,null).get("/api/health"),r->{
+                    if(!"ok".equals(r.optString("status")) || !"devnet".equals(r.optString("cluster")))throw new IllegalArgumentException("This address is not an available Aura devnet pilot.");
+                    message("Aura server is reachable. Connect your wallet or create a pairing code.");
+                },null);
+            }catch(Exception e){problem(e);}
+        });
         button(body,"Connect Android wallet ↗",()->nativeSignIn(server.getText().toString()));
         body.addView(text("Use an installed MWA-compatible wallet, or pair through the browser below. Devnet only.",12,MUTED));
         button(body,"Create pairing code ↗",()->{
             try {
-                String normalized = AuraApi.normalize(server.getText().toString(),BuildConfig.DEBUG);stopDiscovery();authEpoch++;origin=normalized;token=null;api=new AuraApi(origin,null);preferences.edit().putString("server",origin).apply();
+                String normalized = AuraApi.normalize(server.getText().toString(),BuildConfig.DEBUG);stopDiscovery();authEpoch++;pairingSecret=null;main.removeCallbacks(pairingPoll);origin=normalized;token=null;api=new AuraApi(origin,null);preferences.edit().putString("server",origin).apply();
                 request(c->c.post("/api/device/start",AuraApi.object()),r->{pairingSecret=r.getString("deviceSecret");pairingCode=r.getString("code");pairingExpires=r.getLong("expires");render();if(foreground)main.post(pairingPoll);},null);
             } catch(Exception e){problem(e);}
         });
-        if(pairingSecret!=null){TextView code=text(pairingCode,30,LIME);code.setTypeface(Typeface.MONOSPACE);code.setTextIsSelectable(true);body.addView(code);body.addView(text("Verify your wallet in the web companion, then approve this code under Connect your phone. The code expires in five minutes.",14,MUTED));button(body,"Open wallet companion ↗",()->open(origin));}
+        if(pairingSecret!=null){TextView code=text(pairingCode,30,LIME);code.setTypeface(Typeface.MONOSPACE);code.setTextIsSelectable(true);body.addView(code);body.addView(text("Verify your wallet in the web companion, then approve this code under Connect your phone. The code expires in five minutes. This is not the event code. Use a separate wallet for each participant during discovery testing.",14,MUTED));button(body,"Open wallet companion ↗",()->open(origin));}
         body.addView(text("This Android build supports nearby discovery. Precise Android UWB/AR positioning remains in development. Native wallet integration requires a compatible installed wallet.",12,MUTED));
     }
     private void pollPairing() {
@@ -151,8 +161,14 @@ public final class MainActivity extends androidx.activity.ComponentActivity impl
         request(c->c.post("/api/device/poll",AuraApi.object("deviceSecret",secret)),r->{
             if(!secret.equals(pairingSecret))return;
             if(r.has("token")){String received=r.getString("token");sessions.save(origin,received);token=received;api=new AuraApi(origin,token);profile=r.getJSONObject("profile");pairingSecret=null;main.removeCallbacks(pairingPoll);refresh();}
-            else if(foreground)main.postDelayed(pairingPoll,2000);
-        },r->{if(!secret.equals(pairingSecret))return;pairingSecret=null;render();message(r.optString("error"));});
+            else if(foreground){main.removeCallbacks(pairingPoll);main.postDelayed(pairingPoll,3000);}
+        },r->{
+            if(!secret.equals(pairingSecret))return;
+            if(r.optBoolean("retryable") && System.currentTimeMillis()<pairingExpires){
+                message(r.optString("error")+" Retrying while this code is valid.");
+                main.removeCallbacks(pairingPoll);if(foreground)main.postDelayed(pairingPoll,5000);
+            }else{pairingSecret=null;render();message(r.optString("error"));}
+        });
     }
     private void refresh() {
         if(token==null)return;

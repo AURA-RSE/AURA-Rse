@@ -1,8 +1,18 @@
 # Verification record
 
+## 2026-10-11 — submission polish and fresh verification
+
+- iPhone build 3 adds actionable local-network/server errors, an explicit health check before pairing, expiring local-only code copying, a visible countdown, corrected wallet-browser instructions, automatic retries for transient polling failures, and generation checks against stale pairing replies. Room Camera now distinguishes discovered Android participants from compatible iPhone positioning peers. Nearby search offers a clear-filter action.
+- Android version code 4 adds server checking, actionable connection failures and bounded pairing retry until expiry. Web approval rejects an event code entered as a pairing code; the browser regression creates a real isolated API pairing, approves it, and verifies the resulting account.
+- **36 backend tests, 15 projection assertions, five Android emulator tests, 14 Android discovery-rule assertions and 416 transaction-integrity assertions pass.** Web build and browser integration pass. Wallets/RPC in automated browser and emulator checks are fixtures.
+- Unsigned and signed iPhone build 3 succeed; strict code-signature verification passes. Android debug APK and instrumentation build succeed. Android lint reports **0 errors and 26 warnings**, including existing dependency/translation/debug-HTTP advisories. This update has not been installed or retested on the physical phones.
+- Published the existing 2 October manual single-pair physical discovery record alongside the physical wallet-sign-in record. These initial observations do not establish latency, repeatability, crowded-room performance or measured spatial alignment. The later user-assisted session also produced recent server resolution records in both directions; no timing benchmark or extra device run is invented from that inspection.
+- Retried the isolated generated-wallet devnet smoke check on 11 October. The faucet returned an internal error before funding; **no transfer was submitted and no wallet-approved payment receipt is claimed**.
+- Added a reviewer brief and a container/deployment recipe. No hosting service is provisioned; Docker execution is unverified because Docker is unavailable on this Mac. Native Node API/browser execution is verified separately. Physical camera alignment requires another compatible iPhone; Android spatial placement remains unimplemented.
+
 ## 2026-10-03 — build 2 installed and pilot server upgraded
 
-- Installed the signed iPhone update; a device app query reports Aura build 2. Automatic launch was blocked by the device locking again. Manual camera operation and spatial accuracy remain unverified.
+- Installed the signed iPhone update; a device app query reports Aura build 2. Automatic launch was blocked by the device locking again. The user subsequently opened the app, paired it and used discovery. Measured spatial placement remains unverified.
 - Stopped the verified Aura process, created and integrity-checked a private SQLite backup, and restarted the updated server on its existing local address. Health reports schema 4 and devnet.
 - Compared profiles, events, memberships, saved connections, payments and media against the snapshot: row counts and full-table fingerprints match. Database integrity and foreign-key checks pass. Raw device logs, database snapshots and identifiers remain outside public evidence.
 
@@ -13,7 +23,7 @@
 - **36 backend tests pass**, including migration of v3 presence records to schema v4, incompatible-phone rejection, three-peer limits, wrong-recipient denial, expired presence, cancellation isolation, and fresh-session reset versus ordinary renewal.
 - **15 projection assertions pass** against the renderer's actual Swift helper: camera translation, turning away, multiple positions, offscreen/behind-camera hiding, invalid values, tracking loss, and monotonic freshness boundaries. These are synthetic geometry tests, not hardware accuracy evidence.
 - **Five Android emulator tests pass** against the upgraded server. The block test now supplies a fresh simulated observation for the remaining peer after editing notes, preventing unrelated 15-second observation expiry from contaminating its block assertion. Web companion fixture checks also pass.
-- Final iPhone **build 2** compiled and signed successfully; codesign verification passed. The phone is disconnected, so the update is not installed. The live pilot database/server has not been migrated in place; its backup and controlled restart are required before testing the new protocol.
+- Final iPhone **build 2** compiled and signed successfully; codesign verification passed. At the time of this build record, installation and server migration were pending. Both were subsequently completed in the build 2 installation entry above.
 - Concurrent NI feasibility, physical marker alignment, moving-device accuracy, and occlusion remain unverified. Android spatial placement and event-wide coverage are not implemented. See `../ROOM-CAMERA.md` for the first physical test and upgrade steps.
 
 ## 2026-10-03 — separate event search and iPhone branding

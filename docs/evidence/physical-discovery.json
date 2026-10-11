@@ -1,0 +1,23 @@
+{
+  "recordedAt": "2026-10-02T13:53:09.193Z",
+  "scenario": "Physical iPhone and Android nearby profile discovery",
+  "sourceCommit": "fc90264ce3fc579a1d641b65423a6b146338da9a",
+  "devices": [
+    {
+      "model": "iPhone 15 Pro",
+      "os": "iOS 26.7"
+    },
+    {
+      "model": "Samsung SM-A055F",
+      "os": "Android 15"
+    }
+  ],
+  "userObservation": "User confirmed the iPhone could open the Android test profile and the Android displayed the iPhone test profile.",
+  "backendObservation": {
+    "activePresence": 1,
+    "directedProfileAccess": 1,
+    "reciprocalProfilePairs": 0
+  },
+  "scope": "Manual single-pair discovery observed on both physical phones, with backend corroboration. Repeatability, timing, spatial accuracy and payments are not established by this record.",
+  "userConfirmedAt": "2026-10-02T13:55:07.104633+00:00"
+}
